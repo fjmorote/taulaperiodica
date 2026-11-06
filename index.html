@@ -63,6 +63,8 @@
   header { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; justify-content: space-between; }
   h1 { font-size: 1.4rem; margin: 0; }
   .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .controls select { flex: 1 1 150px; min-width: 0; }
+  @media (max-width: 600px) { .controls { width: 100%; } .controls button { flex: 1 1 100%; min-height: 40px; } header { gap: 8px; } }
   select, button, input { font: inherit; color: inherit; }
   select {
     background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
@@ -174,6 +176,9 @@
   .done { text-align: center; display: none; gap: 10px; }
   .done h2 { margin: 0; }
   .done.show { display: grid; }
+  [hidden] { display: none !important; }
+  .cell.cur.sym::after { content: none; }
+  .cell.cur .s { font-size: 1.9em; }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 </style>
 </head>
@@ -182,6 +187,19 @@
   <header>
     <h1>Taula periòdica · Joc</h1>
     <div class="controls">
+      <label class="sr" for="level">Nivell</label>
+      <select id="level">
+        <option value="basic">Bàsic · veus el símbol → nom</option>
+        <option value="medium">Mitjà · símbol + nom</option>
+        <option value="adv">Avançat · símbol + nom + protons</option>
+        <option value="expert">Expert · tot (amb esquerra/dreta)</option>
+      </select>
+      <label class="sr" for="order">Ordre</label>
+      <select id="order">
+        <option value="random">Ordre: aleatori</option>
+        <option value="rows">Ordre: per files</option>
+        <option value="cols">Ordre: per columnes</option>
+      </select>
       <label class="sr" for="scope">Abast</label>
       <select id="scope">
         <option value="all">Tota la taula (47)</option>
@@ -300,7 +318,24 @@ const SCOPES = {
   trans: z => { const c = pos(z)[1]; return c >= 6 && c <= 12; },
 };
 
+const LEVELS = {
+  basic:  { show: true,  sym: false, name: true, z: false, ch: false },
+  medium: { show: false, sym: true,  name: true, z: false, ch: false },
+  adv:    { show: false, sym: true,  name: true, z: true,  ch: false },
+  expert: { show: false, sym: true,  name: true, z: true,  ch: true  },
+};
+
 const $ = id => document.getElementById(id);
+const lv = () => LEVELS[$('level').value];
+const SETTINGS_KEY = 'taulaperiodica.v1';
+try {
+  const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+  for (const id of ['level', 'order', 'scope'])
+    if (saved[id] && [...$(id).options].some(o => o.value === saved[id])) $(id).value = saved[id];
+} catch (e) { /* sense emmagatzematge: no passa res */ }
+function saveSettings() {
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ level: $('level').value, order: $('order').value, scope: $('scope').value })); } catch (e) {}
+}
 const tableEl = $('table');
 const cellEls = {};
 
@@ -341,7 +376,12 @@ function setCell(z, state) {
 function start() {
   const inScope = SCOPES[$('scope').value];
   for (const e of ELS) setCell(e.z, inScope(e.z) ? '' : 'off');
-  queue = shuffle(ELS.filter(e => inScope(e.z)).map(e => e.z));
+  const list = ELS.filter(e => inScope(e.z));
+  const order = $('order').value;
+  if (order === 'rows') list.sort((a, b) => { const pa = pos(a.z), pb = pos(b.z); return pa[0] - pb[0] || pa[1] - pb[1]; });
+  else if (order === 'cols') list.sort((a, b) => { const pa = pos(a.z), pb = pos(b.z); return pa[1] - pb[1] || pa[0] - pb[0]; });
+  else shuffle(list);
+  queue = list.map(e => e.z);
   total = queue.length; doneCount = 0; firstTry = 0; requeued = new Set(); cur = null;
   $('done').classList.remove('show'); $('quiz').style.display = '';
   updateStats(); next();
@@ -357,16 +397,19 @@ function next() {
   if (!queue.length) return finish();
   cur = BY_Z[queue.shift()]; attempts = 0; solved = false;
   const [r, c] = pos(cur.z);
-  cellEls[cur.z].className = 'cell cur'; cellEls[cur.z].innerHTML = '';
+  const L = lv();
+  cellEls[cur.z].className = 'cell cur' + (L.show ? ' sym' : '');
+  cellEls[cur.z].innerHTML = L.show ? '<span class="s">' + cur.sym + '</span>' : '';
   const where = 'Grup ' + c + ' · Període ' + r;
-  $('where').innerHTML = 'Quina casella és la que brilla?<small>' + where + '</small>';
+  $('where').innerHTML = (L.show ? 'Quin és el nom d\'aquest element?' : 'Quina casella és la que brilla?') + '<small>' + where + '</small>';
+  $('fSym').hidden = !L.sym; $('fCh').hidden = !L.ch; $('fName').hidden = !L.name; $('fZ').hidden = !L.z;
   $('form').reset();
   for (const id of ['fSym', 'fCh', 'fName', 'fZ']) { const f = $(id); f.className = 'field'; f.querySelector('.note').textContent = ''; }
   resetSel();
   zoneEl.l.classList.remove('good', 'bad'); zoneEl.r.classList.remove('good', 'bad');
   showMsg('');
   $('btnMain').textContent = 'Comprova'; $('btnSolve').disabled = false; $('btnSkip').disabled = false;
-  $('inSym').focus({ preventScroll: true });
+  (L.sym ? $('inSym') : $('inName')).focus({ preventScroll: true });
 }
 
 function finish() {
@@ -438,14 +481,16 @@ function solutionText() {
 
 function check() {
   attempts++;
-  const r = grade();
-  mark('fSym', r.sym, r.sym ? '' : 'Torna-ho a provar');
-  mark('fName', r.name, r.name ? (r.nameExact ? '' : 'Ortografia: ' + cur.name) : 'Torna-ho a provar');
-  mark('fZ', r.z, r.z ? '' : 'Torna-ho a provar');
-  mark('fCh', r.ch, r.ch ? '' : 'Torna-ho a provar (esquerra ' + (r.l ? '✓' : '✗') + ', dreta ' + (r.r ? '✓' : '✗') + ' · compte amb l\'ordre)');
-  zoneEl.l.classList.toggle('good', r.l); zoneEl.l.classList.toggle('bad', !r.l);
-  zoneEl.r.classList.toggle('good', r.r); zoneEl.r.classList.toggle('bad', !r.r);
-  if (r.sym && r.name && r.z && r.ch) {
+  const r = grade(), L = lv();
+  if (L.sym) mark('fSym', r.sym, r.sym ? '' : 'Torna-ho a provar');
+  if (L.name) mark('fName', r.name, r.name ? (r.nameExact ? '' : 'Ortografia: ' + cur.name) : 'Torna-ho a provar');
+  if (L.z) mark('fZ', r.z, r.z ? '' : 'Torna-ho a provar');
+  if (L.ch) {
+    mark('fCh', r.ch, r.ch ? '' : 'Torna-ho a provar (esquerra ' + (r.l ? '✓' : '✗') + ', dreta ' + (r.r ? '✓' : '✗') + ' · compte amb l\'ordre)');
+    zoneEl.l.classList.toggle('good', r.l); zoneEl.l.classList.toggle('bad', !r.l);
+    zoneEl.r.classList.toggle('good', r.r); zoneEl.r.classList.toggle('bad', !r.r);
+  }
+  if ((!L.sym || r.sym) && (!L.name || r.name) && (!L.z || r.z) && (!L.ch || r.ch)) {
     solved = true;
     const first = attempts === 1;
     if (first) firstTry++;
@@ -463,10 +508,15 @@ function skip() {
 }
 
 function reveal() {
+  const L = lv();
   $('inSym').value = cur.sym; $('inName').value = cur.name; $('inZ').value = cur.z;
-  mark('fSym', true); mark('fName', true); mark('fZ', true);
-  sel.l = cur.l.slice(); sel.r = cur.r.slice(); renderZones(); mark('fCh', true);
-  zoneEl.l.classList.add('good'); zoneEl.r.classList.add('good');
+  if (L.sym) mark('fSym', true);
+  if (L.name) mark('fName', true);
+  if (L.z) mark('fZ', true);
+  if (L.ch) {
+    sel.l = cur.l.slice(); sel.r = cur.r.slice(); renderZones(); mark('fCh', true);
+    zoneEl.l.classList.add('good'); zoneEl.r.classList.add('good');
+  }
   setCell(cur.z, 'ko'); doneCount++;
   if (!requeued.has(cur.z)) { requeued.add(cur.z); queue.push(cur.z); total++; }
   updateStats();
@@ -489,7 +539,7 @@ $('btnSolve').addEventListener('click', () => { if (!solved) reveal(); });
 $('btnSkip').addEventListener('click', () => { if (!solved) skip(); });
 $('btnAgain').addEventListener('click', start);
 $('restart').addEventListener('click', start);
-$('scope').addEventListener('change', start);
+for (const id of ['level', 'order', 'scope']) $(id).addEventListener('change', () => { saveSettings(); start(); });
 
 buildTable();
 start();

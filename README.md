@@ -14,6 +14,20 @@ Les caselles s'acoloreixen segons el resultat (al primer intent / amb errors / s
 i les que falles tornen a sortir al final. Es pot limitar l'abast (períodes 1–3, 1–4,
 grups principals, metalls de transició).
 
+## Nivells
+
+| Nivell | Què veus | Què demana |
+|---|---|---|
+| Bàsic | el símbol a la casella | nom |
+| Mitjà | res (casella amb «?») | símbol + nom |
+| Avançat | res | símbol + nom + protons |
+| Expert | res | tot: símbol + nom + protons + +/− (esquerra/dreta i ordre) |
+
+## Ordre
+
+Aleatori, **per files** (període a període, d'esquerra a dreta) o **per columnes** (grup a grup, de dalt a baix).
+El nivell, l'ordre i l'abast es recorden al navegador.
+
 ## Ús
 
 Obre `index.html` al navegador.
