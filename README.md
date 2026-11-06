@@ -6,7 +6,7 @@ estats d'oxidació / càrregues dels ions (47 elements, els de la taula del full
 L'app il·lumina una casella a l'atzar i has d'omplir:
 
 - **Símbol**
-- **+/−**: marca **tots** els valors de la casella (negatius en blau, positius en vermell)
+- **+/−**: com a la taula del full, cada casella té una columna **esquerra** i una **dreta**, i els valors s'han de posar **en el mateix ordre** de dalt a baix (p. ex. N: esquerra −3, dreta +1 +3 +5 +2; Mn: esquerra +6 +7, dreta +2 +3 +4). Negatius en blau, positius en vermell
 - **Nom** en català (normativa de l'IEC; accepta sense accents ni punt volat)
 - **Protons** (nombre atòmic)
 
