@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Taula periòdica · Joc</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --surface: #ffffff;
+    --ink: #1c2230;
+    --muted: #6a7385;
+    --line: #d9dde5;
+    --accent: #3b5bdb;
+    --accent-ink: #ffffff;
+    --ok: #2b8a3e;
+    --ok-bg: #e3f4e7;
+    --mid: #b36b00;
+    --mid-bg: #fff1d6;
+    --ko: #c92a2a;
+    --ko-bg: #fde4e4;
+    --cell: #eceff4;
+    --cell-off: #f3f4f7;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151c;
+      --surface: #1b2029;
+      --ink: #e8ebf2;
+      --muted: #98a1b3;
+      --line: #2e3544;
+      --accent: #748ffc;
+      --accent-ink: #0f1320;
+      --ok: #69db7c;
+      --ok-bg: #1d3a26;
+      --mid: #ffc078;
+      --mid-bg: #3d2f14;
+      --ko: #ff8787;
+      --ko-bg: #402022;
+      --cell: #262c39;
+      --cell-off: #1a1e27;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: 16px;
+  }
+  .app { max-width: 1280px; margin: 0 auto; display: grid; gap: 16px; }
+  .board { order: 1; }
+  .panel { order: 2; }
+  @media (min-width: 1000px) {
+    .app { grid-template-columns: minmax(0, 1fr) 380px; align-items: start; }
+    .panel { position: sticky; top: 16px; }
+  }
+  header { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; justify-content: space-between; }
+  h1 { font-size: 1.4rem; margin: 0; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  select, button, input { font: inherit; color: inherit; }
+  select {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+  }
+  button {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+    padding: 9px 14px; cursor: pointer; min-height: 44px;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+  button:focus-visible, input:focus-visible, select:focus-visible, label:focus-within {
+    outline: 3px solid color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: 1px;
+  }
+
+  /* ---------- Taula ---------- */
+  .board { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px; container-type: inline-size; }
+  .table {
+    display: grid;
+    grid-template-columns: 1.2em repeat(18, minmax(0, 1fr));
+    grid-template-rows: 1.2em repeat(7, auto) 0.5em repeat(2, auto);
+    gap: 2px;
+    font-size: calc(100cqw / 19 * 0.3);
+  }
+  .hdr { color: var(--muted); display: grid; place-items: center; font-size: .85em; }
+  .cell {
+    aspect-ratio: 1 / 1; border-radius: 4px; background: var(--cell);
+    display: grid; place-items: center; align-content: center; text-align: center;
+    line-height: 1.05; overflow: hidden; border: 1px solid transparent;
+  }
+  .cell.off { background: var(--cell-off); opacity: .45; }
+  .cell.ph { background: transparent; border: 1px dashed var(--line); color: var(--muted); font-size: .7em; }
+  .cell .z { font-size: .7em; color: var(--muted); }
+  .cell .s { font-weight: 700; font-size: 1.2em; }
+  .cell.ok  { background: var(--ok-bg);  border-color: var(--ok);  color: var(--ok); }
+  .cell.mid { background: var(--mid-bg); border-color: var(--mid); color: var(--mid); }
+  .cell.ko  { background: var(--ko-bg);  border-color: var(--ko);  color: var(--ko); }
+  .cell.cur {
+    background: var(--accent); border-color: var(--accent); color: var(--accent-ink);
+    animation: pulse 1.2s ease-in-out infinite; z-index: 1;
+  }
+  .cell.cur::after { content: "?"; font-weight: 800; font-size: 1.6em; }
+  @keyframes pulse { 50% { transform: scale(1.12); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 35%, transparent); } }
+  @media (prefers-reduced-motion: reduce) { .cell.cur { animation: none; } }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; color: var(--muted); font-size: .85rem; }
+  .legend i { display: inline-block; width: .9em; height: .9em; border-radius: 3px; margin-right: 5px; vertical-align: -1px; border: 1px solid; }
+
+  /* ---------- Panell ---------- */
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 14px; }
+  .stats { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: .9rem; }
+  .stats b { color: var(--ink); }
+  .bar { height: 6px; border-radius: 3px; background: var(--cell); overflow: hidden; }
+  .bar > div { height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+  .where { font-weight: 600; font-size: 1.05rem; }
+  .where small { display: block; font-weight: 400; color: var(--muted); font-size: .85rem; }
+  form { display: grid; gap: 12px; }
+  .field { display: grid; gap: 4px; }
+  .field > label, .field > .lbl { font-size: .85rem; color: var(--muted); }
+  .field input[type=text], .field input[type=number] {
+    width: 100%; background: var(--bg); border: 2px solid var(--line); border-radius: 8px; padding: 10px 12px; font-size: 1.1rem;
+  }
+  .field.ok input { border-color: var(--ok); background: var(--ok-bg); }
+  .field.ko input { border-color: var(--ko); background: var(--ko-bg); }
+  .field.ok .seg label.on { background: var(--ok); border-color: var(--ok); }
+  .field.ko .seg label.on { background: var(--ko); border-color: var(--ko); }
+  .field .note { font-size: .8rem; min-height: 0; }
+  .field.ok .note { color: var(--ok); }
+  .field.ko .note { color: var(--ko); }
+  .charge { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: stretch; }
+  .seg { display: flex; }
+  .seg input { position: absolute; opacity: 0; pointer-events: none; }
+  .seg label {
+    display: grid; place-items: center; min-width: 46px; min-height: 46px; border: 2px solid var(--line);
+    background: var(--bg); cursor: pointer; font-weight: 700; font-size: 1.1rem; user-select: none;
+  }
+  .seg label:first-of-type { border-radius: 8px 0 0 8px; }
+  .seg label:last-of-type { border-radius: 0 8px 8px 0; }
+  .seg label + input + label, .seg input + label + input + label { margin-left: -2px; }
+  .seg label.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .field.disabled { opacity: .55; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .actions .primary { flex: 1 1 140px; }
+  .msg { padding: 10px 12px; border-radius: 8px; font-size: .95rem; display: none; }
+  .msg.show { display: block; }
+  .msg.good { background: var(--ok-bg); color: var(--ok); }
+  .msg.bad { background: var(--ko-bg); color: var(--ko); }
+  .msg.info { background: var(--mid-bg); color: var(--mid); }
+  .done { text-align: center; display: none; gap: 10px; }
+  .done h2 { margin: 0; }
+  .done.show { display: grid; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Taula periòdica · Joc</h1>
+    <div class="controls">
+      <label class="sr" for="scope">Abast</label>
+      <select id="scope">
+        <option value="all">Tota la taula (118)</option>
+        <option value="36">Els 36 primers</option>
+        <option value="54">Els 54 primers</option>
+        <option value="nof">Sense lantànids ni actínids</option>
+        <option value="main">Només grups principals</option>
+      </select>
+      <button id="restart" type="button">Reinicia</button>
+    </div>
+  </header>
+
+  <section class="panel" aria-live="polite">
+    <div class="stats">
+      <span>Ronda: <b id="stDone">0</b>/<b id="stTotal">0</b></span>
+      <span>Al primer intent: <b id="stFirst">0</b></span>
+    </div>
+    <div class="bar"><div id="bar"></div></div>
+
+    <div id="quiz">
+      <div class="where" id="where"></div>
+      <form id="form" autocomplete="off" novalidate>
+        <div class="field" id="fSym">
+          <label for="inSym">Símbol</label>
+          <input type="text" id="inSym" maxlength="3" autocapitalize="off" autocorrect="off" spellcheck="false">
+          <div class="note"></div>
+        </div>
+        <div class="field" id="fCh">
+          <span class="lbl" id="lblCh">+/− (càrrega de l'ió)</span>
+          <div class="charge" role="group" aria-labelledby="lblCh">
+            <div class="seg">
+              <input type="radio" name="sign" id="sgP" value="+"><label for="sgP">+</label>
+              <input type="radio" name="sign" id="sgM" value="-"><label for="sgM" aria-label="menys">−</label>
+              <input type="radio" name="sign" id="sg0" value="0"><label for="sg0">0</label>
+            </div>
+            <input type="number" id="inN" min="1" max="8" inputmode="numeric" placeholder="valor (1–8)" aria-label="Valor de la càrrega">
+          </div>
+          <div class="note"></div>
+        </div>
+        <div class="field" id="fName">
+          <label for="inName">Nom (en català)</label>
+          <input type="text" id="inName" autocapitalize="off" autocorrect="off" spellcheck="false">
+          <div class="note"></div>
+        </div>
+        <div class="field" id="fZ">
+          <label for="inZ">Protons</label>
+          <input type="number" id="inZ" min="1" max="118" inputmode="numeric">
+          <div class="note"></div>
+        </div>
+        <div class="msg" id="msg" role="status"></div>
+        <div class="actions">
+          <button class="primary" id="btnMain" type="submit">Comprova</button>
+          <button id="btnSolve" type="button">Solució</button>
+          <button id="btnSkip" type="button">Salta</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="done" id="done">
+      <h2>Taula completada! 🎉</h2>
+      <p id="doneTxt"></p>
+      <button class="primary" id="btnAgain" type="button">Torna a jugar</button>
+    </div>
+  </section>
+
+  <section class="board">
+    <div class="table" id="table" role="img" aria-label="Taula periòdica"></div>
+    <div class="legend">
+      <span><i style="background:var(--ok-bg);border-color:var(--ok)"></i>Al primer intent</span>
+      <span><i style="background:var(--mid-bg);border-color:var(--mid)"></i>Amb errors</span>
+      <span><i style="background:var(--ko-bg);border-color:var(--ko)"></i>Solució / saltat</span>
+    </div>
+  </section>
+</div>
+
+<script>
+'use strict';
+
+// [símbol, nom en català (IEC), càrregues/estats d'oxidació habituals (la primera és la més comuna)]
+const DATA = [
+  ['H','hidrogen',[1,-1]],['He','heli',[0]],
+  ['Li','liti',[1]],['Be','beril·li',[2]],['B','bor',[3]],['C','carboni',[4,-4,2]],['N','nitrogen',[-3,3,5]],['O','oxigen',[-2]],['F','fluor',[-1]],['Ne','neó',[0]],
+  ['Na','sodi',[1]],['Mg','magnesi',[2]],['Al','alumini',[3]],['Si','silici',[4,-4]],['P','fòsfor',[-3,3,5]],['S','sofre',[-2,4,6]],['Cl','clor',[-1,1,3,5,7]],['Ar','argó',[0]],
+  ['K','potassi',[1]],['Ca','calci',[2]],['Sc','escandi',[3]],['Ti','titani',[4,3]],['V','vanadi',[5,4,3,2]],['Cr','crom',[3,2,6]],['Mn','manganès',[2,4,7,3]],['Fe','ferro',[2,3]],['Co','cobalt',[2,3]],['Ni','níquel',[2]],['Cu','coure',[2,1]],['Zn','zinc',[2]],['Ga','gal·li',[3]],['Ge','germani',[4,2]],['As','arsènic',[-3,3,5]],['Se','seleni',[-2,4,6]],['Br','brom',[-1,1,5]],['Kr','criptó',[0]],
+  ['Rb','rubidi',[1]],['Sr','estronci',[2]],['Y','itri',[3]],['Zr','zirconi',[4]],['Nb','niobi',[5,3]],['Mo','molibdè',[6,4]],['Tc','tecneci',[7,4]],['Ru','ruteni',[3,4]],['Rh','rodi',[3]],['Pd','pal·ladi',[2,4]],['Ag','plata',[1]],['Cd','cadmi',[2]],['In','indi',[3]],['Sn','estany',[2,4]],['Sb','antimoni',[3,5,-3]],['Te','tel·luri',[-2,4,6]],['I','iode',[-1,1,5,7]],['Xe','xenó',[0]],
+  ['Cs','cesi',[1]],['Ba','bari',[2]],
+  ['La','lantani',[3]],['Ce','ceri',[3,4]],['Pr','praseodimi',[3]],['Nd','neodimi',[3]],['Pm','prometi',[3]],['Sm','samari',[3,2]],['Eu','europi',[3,2]],['Gd','gadolini',[3]],['Tb','terbi',[3]],['Dy','disprosi',[3]],['Ho','holmi',[3]],['Er','erbi',[3]],['Tm','tuli',[3]],['Yb','iterbi',[3,2]],['Lu','luteci',[3]],
+  ['Hf','hafni',[4]],['Ta','tàntal',[5]],['W','wolframi',[6,4]],['Re','reni',[7,4]],['Os','osmi',[4,8]],['Ir','iridi',[3,4]],['Pt','platí',[2,4]],['Au','or',[3,1]],['Hg','mercuri',[2,1]],['Tl','tal·li',[1,3]],['Pb','plom',[2,4]],['Bi','bismut',[3,5]],['Po','poloni',[2,4]],['At','àstat',[-1]],['Rn','radó',[0]],
+  ['Fr','franci',[1]],['Ra','radi',[2]],
+  ['Ac','actini',[3]],['Th','tori',[4]],['Pa','protactini',[5,4]],['U','urani',[6,4]],['Np','neptuni',[5]],['Pu','plutoni',[4,3]],['Am','americi',[3]],['Cm','curi',[3]],['Bk','berkeli',[3,4]],['Cf','californi',[3]],['Es','einsteini',[3]],['Fm','fermi',[3]],['Md','mendelevi',[3]],['No','nobeli',[2]],['Lr','lawrenci',[3]],
+  ['Rf','rutherfordi',[4]],['Db','dubni',[5]],['Sg','seaborgi',[6]],['Bh','bohri',[7]],['Hs','hassi',[8]],['Mt','meitneri',[]],['Ds','darmstadti',[]],['Rg','roentgeni',[]],['Cn','copernici',[2]],['Nh','nihoni',[1]],['Fl','flerovi',[2]],['Mc','moscovi',[1]],['Lv','livermori',[2]],['Ts','tennessi',[-1]],['Og','oganessó',[0]],
+];
+const ELS = DATA.map((e, i) => ({ z: i + 1, sym: e[0], name: e[1], ch: e[2] }));
+
+// Posició (fila, columna) a la graella: files 1-7 = períodes, 9 = lantànids, 10 = actínids
+function pos(z) {
+  if (z === 1) return [1, 1];
+  if (z === 2) return [1, 18];
+  if (z <= 4) return [2, z - 2];
+  if (z <= 10) return [2, z + 8];
+  if (z <= 12) return [3, z - 10];
+  if (z <= 18) return [3, z];
+  if (z <= 36) return [4, z - 18];
+  if (z <= 54) return [5, z - 36];
+  if (z <= 56) return [6, z - 54];
+  if (z <= 71) return [9, z - 54];
+  if (z <= 86) return [6, z - 68];
+  if (z <= 88) return [7, z - 86];
+  if (z <= 103) return [10, z - 86];
+  return [7, z - 100];
+}
+const isMain = z => { const c = pos(z)[1], r = pos(z)[0]; return r <= 7 && (c <= 2 || c >= 13); };
+const SCOPES = {
+  all:  z => true,
+  '36': z => z <= 36,
+  '54': z => z <= 54,
+  nof:  z => { const r = pos(z)[0]; return r <= 7; },
+  main: isMain,
+};
+
+const $ = id => document.getElementById(id);
+const tableEl = $('table');
+const cellEls = {};
+
+// ---------- Construcció de la taula ----------
+function buildTable() {
+  tableEl.innerHTML = '';
+  const put = (el, r, c) => { el.style.gridRow = r + 1; el.style.gridColumn = c + 1; tableEl.appendChild(el); };
+  for (let c = 1; c <= 18; c++) { const h = document.createElement('div'); h.className = 'hdr'; h.textContent = c; put(h, 0, c); }
+  for (let r = 1; r <= 7; r++) { const h = document.createElement('div'); h.className = 'hdr'; h.textContent = r; put(h, r, 0); }
+  for (const e of ELS) {
+    const d = document.createElement('div'); d.className = 'cell';
+    const [r, c] = pos(e.z); put(d, r, c); cellEls[e.z] = d;
+  }
+  for (const [r, txt] of [[6, '57–71'], [7, '89–103']]) {
+    const p = document.createElement('div'); p.className = 'cell ph'; p.textContent = txt; put(p, r, 3);
+  }
+}
+
+// ---------- Estat del joc ----------
+let queue = [], total = 0, doneCount = 0, firstTry = 0;
+let cur = null, attempts = 0, solved = false, requeued = new Set();
+
+function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+
+function setCell(z, state) {
+  const d = cellEls[z], e = ELS[z - 1];
+  d.className = 'cell' + (state ? ' ' + state : '');
+  d.removeAttribute('title');
+  if (state === 'ok' || state === 'mid' || state === 'ko') {
+    d.innerHTML = '<span class="z">' + z + '</span><span class="s">' + e.sym + '</span>';
+    d.title = e.name;
+  } else d.innerHTML = '';
+}
+
+function start() {
+  const inScope = SCOPES[$('scope').value];
+  for (const e of ELS) setCell(e.z, inScope(e.z) ? '' : 'off');
+  queue = shuffle(ELS.filter(e => inScope(e.z)).map(e => e.z));
+  total = queue.length; doneCount = 0; firstTry = 0; requeued = new Set(); cur = null;
+  $('done').classList.remove('show'); $('quiz').style.display = '';
+  updateStats(); next();
+}
+
+function updateStats() {
+  $('stDone').textContent = doneCount; $('stTotal').textContent = total; $('stFirst').textContent = firstTry;
+  $('bar').style.width = total ? (100 * doneCount / total) + '%' : '0';
+}
+
+function next() {
+  if (cur) { const d = cellEls[cur.z]; if (d.classList.contains('cur')) setCell(cur.z, ''); }
+  if (!queue.length) return finish();
+  cur = ELS[queue.shift() - 1]; attempts = 0; solved = false;
+  const [r, c] = pos(cur.z);
+  cellEls[cur.z].className = 'cell cur'; cellEls[cur.z].innerHTML = '';
+  let where;
+  if (r === 9) where = 'Lantànids · ' + (c - 2) + 'a posició';
+  else if (r === 10) where = 'Actínids · ' + (c - 2) + 'a posició';
+  else where = 'Grup ' + c + ' · Període ' + r;
+  $('where').innerHTML = 'Quina casella és la que brilla?<small>' + where + '</small>';
+  $('form').reset();
+  for (const id of ['fSym', 'fCh', 'fName', 'fZ']) { const f = $(id); f.className = 'field'; f.querySelector('.note').textContent = ''; }
+  syncSeg();
+  const noCh = cur.ch.length === 0;
+  $('fCh').classList.toggle('disabled', noCh);
+  $('inN').disabled = noCh; document.querySelectorAll('input[name=sign]').forEach(i => i.disabled = noCh);
+  if (noCh) $('fCh').querySelector('.note').textContent = 'Sense dades fiables: no es puntua.';
+  showMsg('');
+  $('btnMain').textContent = 'Comprova'; $('btnSolve').disabled = false; $('btnSkip').disabled = false;
+  $('inSym').focus({ preventScroll: true });
+}
+
+function finish() {
+  $('quiz').style.display = 'none'; $('done').classList.add('show');
+  $('doneTxt').textContent = 'Has encertat ' + firstTry + ' de ' + total + ' caselles al primer intent.';
+  updateStats();
+}
+
+// ---------- Entrada ----------
+function syncSeg() {
+  document.querySelectorAll('.seg label').forEach(l => l.classList.toggle('on', $(l.htmlFor).checked));
+  $('inN').disabled = cur && cur.ch.length === 0 ? true : $('sg0').checked;
+  if ($('sg0').checked) $('inN').value = '';
+}
+document.querySelectorAll('input[name=sign]').forEach(i => i.addEventListener('change', syncSeg));
+
+$('inSym').addEventListener('input', e => {
+  const v = e.target.value.replace(/[^A-Za-z]/g, '');
+  e.target.value = v ? v[0].toUpperCase() + v.slice(1).toLowerCase() : '';
+});
+
+const norm = s => s.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[·.\-'’\s]/g, '');
+const fmtCh = n => n === 0 ? '0' : (n > 0 ? '+' + n : '−' + Math.abs(n));
+
+function readCharge() {
+  const s = document.querySelector('input[name=sign]:checked');
+  if (!s) return null;
+  if (s.value === '0') return 0;
+  const n = parseInt($('inN').value, 10);
+  if (!n || n < 1) return null;
+  return s.value === '+' ? n : -n;
+}
+
+function mark(id, ok, note) {
+  const f = $(id); f.classList.remove('ok', 'ko'); f.classList.add(ok ? 'ok' : 'ko');
+  f.querySelector('.note').textContent = note || '';
+}
+function showMsg(t, kind) { const m = $('msg'); m.className = 'msg' + (t ? ' show ' + kind : ''); m.textContent = t; }
+
+function grade() {
+  const res = {};
+  const sym = $('inSym').value.trim();
+  res.sym = sym === cur.sym;
+  const nm = $('inName').value.trim();
+  res.name = !!nm && norm(nm) === norm(cur.name);
+  res.nameExact = res.name && nm.toLowerCase() === cur.name;
+  const z = parseInt($('inZ').value, 10);
+  res.z = z === cur.z;
+  if (cur.ch.length === 0) res.ch = true;
+  else { const c = readCharge(); res.ch = c !== null && cur.ch.includes(c); }
+  return res;
+}
+
+function solutionText() {
+  const ch = cur.ch.length ? cur.ch.map(fmtCh).join(', ') : 'sense dades';
+  return cur.sym + ' · ' + cur.name + ' · ' + cur.z + ' protons · ' + ch;
+}
+
+function check() {
+  attempts++;
+  const r = grade();
+  mark('fSym', r.sym, r.sym ? '' : 'Torna-ho a provar');
+  mark('fName', r.name, r.name ? (r.nameExact ? '' : 'Ortografia: ' + cur.name) : 'Torna-ho a provar');
+  mark('fZ', r.z, r.z ? '' : 'Torna-ho a provar');
+  if (cur.ch.length) mark('fCh', r.ch, r.ch ? (cur.ch.length > 1 ? 'També: ' + cur.ch.map(fmtCh).join(', ') : '') : 'Torna-ho a provar');
+  if (r.sym && r.name && r.z && r.ch) {
+    solved = true;
+    const first = attempts === 1;
+    if (first) firstTry++;
+    setCell(cur.z, first ? 'ok' : 'mid'); doneCount++; updateStats();
+    showMsg((first ? 'Correcte! ' : 'Ja ho tens! ') + solutionText(), 'good');
+    toNextMode();
+  } else {
+    showMsg('Alguna cosa no quadra. Corregeix els camps en vermell o mira la solució.', 'bad');
+  }
+}
+
+function skip() {
+  queue.push(cur.z);
+  next();
+}
+
+function reveal() {
+  $('inSym').value = cur.sym; $('inName').value = cur.name; $('inZ').value = cur.z;
+  mark('fSym', true); mark('fName', true); mark('fZ', true);
+  if (cur.ch.length) {
+    const c = cur.ch[0];
+    document.querySelector('input[name=sign][value="' + (c === 0 ? '0' : c > 0 ? '+' : '-') + '"]').checked = true;
+    $('inN').value = c === 0 ? '' : Math.abs(c); syncSeg(); mark('fCh', true, cur.ch.length > 1 ? 'Habituals: ' + cur.ch.map(fmtCh).join(', ') : '');
+  }
+  setCell(cur.z, 'ko'); doneCount++;
+  if (!requeued.has(cur.z)) { requeued.add(cur.z); queue.push(cur.z); total++; }
+  updateStats();
+  solved = true;
+  showMsg('Solució: ' + solutionText() + ' (tornarà a sortir al final)', 'info');
+  toNextMode();
+}
+
+function toNextMode() {
+  $('btnMain').textContent = queue.length ? 'Següent' : 'Acaba';
+  $('btnSolve').disabled = true; $('btnSkip').disabled = true;
+  $('btnMain').focus({ preventScroll: true });
+}
+
+$('form').addEventListener('submit', e => {
+  e.preventDefault();
+  if (solved) next(); else check();
+});
+$('btnSolve').addEventListener('click', () => { if (!solved) reveal(); });
+$('btnSkip').addEventListener('click', () => { if (!solved) skip(); });
+$('btnAgain').addEventListener('click', start);
+$('restart').addEventListener('click', start);
+$('scope').addEventListener('change', start);
+
+buildTable();
+start();
+</script>
+</body>
+</html>
