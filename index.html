@@ -9,19 +9,19 @@
     --bg: #f5f6f8;
     --surface: #ffffff;
     --ink: #1c2230;
-    --muted: #6a7385;
+    --muted: #566074;
     --line: #d9dde5;
     --accent: #3b5bdb;
     --accent-ink: #ffffff;
     --ok: #2b8a3e;
     --ok-bg: #e3f4e7;
-    --mid: #b36b00;
-    --mid-bg: #fff1d6;
+    --mid: #7048e8;
+    --mid-bg: #f3efff;
     --ko: #c92a2a;
     --ko-bg: #fde4e4;
     --cell: #fbeccd;
-    --neg: #1c7ed6;
-    --pos: #e03131;
+    --neg: #1864ab;
+    --pos: #c92a2a;
     --cell-off: #f3f4f7;
   }
   @media (prefers-color-scheme: dark) {
@@ -35,8 +35,8 @@
       --accent-ink: #0f1320;
       --ok: #69db7c;
       --ok-bg: #1d3a26;
-      --mid: #ffc078;
-      --mid-bg: #3d2f14;
+      --mid: #b197fc;
+      --mid-bg: #2d2547;
       --ko: #ff8787;
       --ko-bg: #402022;
       --cell: #3a3322;
@@ -54,6 +54,7 @@
     padding: 16px;
   }
   .app { max-width: 1280px; margin: 0 auto; display: grid; gap: 16px; }
+  .app > * { min-width: 0; }
   .board { order: 1; }
   .panel { order: 2; }
   @media (min-width: 1000px) {
@@ -65,16 +66,25 @@
   .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .controls select { flex: 1 1 150px; min-width: 0; }
   .controls button { flex: 0 0 auto; }
-  @media (max-width: 600px) { .controls { width: 100%; } .controls button { flex: 1 1 45%; min-height: 40px; } header { gap: 8px; } }
+  @media (max-width: 600px) {
+    .controls { width: 100%; display: grid; grid-template-columns: 1fr 1fr; }
+    .controls #scope { grid-column: 1 / -1; }
+    header { gap: 8px; }
+  }
+  .hint { grid-column: 1 / -1; margin: -8px 0 0; color: var(--muted); font-size: .9rem; }
   select, button, input { font: inherit; color: inherit; }
   select {
-    background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px; min-height: 44px;
   }
   button {
     background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
     padding: 9px 14px; cursor: pointer; min-height: 44px;
   }
   button:hover { border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button:disabled:hover { border-color: var(--line); }
+  button.primary:disabled:hover { border-color: var(--accent); }
+  #btnSave:disabled { opacity: 1; cursor: default; background: var(--ok-bg); color: var(--ok); border-color: var(--ok); }
   button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
   button:focus-visible, input:focus-visible, select:focus-visible, label:focus-within {
     outline: 3px solid color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: 1px;
@@ -84,12 +94,12 @@
   .board { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px; container-type: inline-size; }
   .table {
     display: grid;
-    grid-template-columns: 1.2em repeat(17, minmax(0, 1fr));
-    grid-template-rows: 1.2em repeat(6, auto);
+    grid-template-columns: max(1.2em, 12px) repeat(17, minmax(0, 1fr));
+    grid-template-rows: max(1.2em, 12px) repeat(6, auto);
     gap: 2px;
     font-size: calc(100cqw / 18 * 0.26);
   }
-  .hdr { color: var(--muted); display: grid; place-items: center; font-size: 1em; }
+  .hdr { color: var(--muted); display: grid; place-items: center; font-size: max(8px, 1em); }
   .cell {
     aspect-ratio: 3 / 4; border-radius: 3px; background: var(--cell);
     display: flex; flex-direction: column; justify-content: space-between; align-items: stretch;
@@ -97,7 +107,7 @@
   }
   .cell.off { opacity: .35; }
   .cell.blank { background: var(--surface); border: 1px solid var(--line); }
-  .cell .s { font-weight: 700; font-size: 1.5em; }
+  .cell .s { font-weight: 700; font-size: max(9px, 1.5em); }
   .cell .cs { display: flex; justify-content: space-between; gap: .3em; font-size: .8em; }
   .cell .cs .col { display: flex; flex-direction: column; }
   .cell .cs .col:first-child { align-items: flex-start; }
@@ -112,10 +122,11 @@
     background: var(--accent); border-color: var(--accent); color: var(--accent-ink);
     animation: pulse 1.2s ease-in-out infinite; z-index: 1; align-items: center; justify-content: center;
   }
-  .cell.cur::after { content: "?"; font-weight: 800; font-size: 1.9em; }
+  .cell.cur::after { content: "?"; font-weight: 800; font-size: max(11px, 1.9em); }
   @keyframes pulse { 50% { transform: scale(1.12); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 35%, transparent); } }
   @media (prefers-reduced-motion: reduce) { .cell.cur { animation: none; } }
-  @container (max-width: 640px) { .cell .cs { display: none; } .cell { align-items: center; justify-content: center; } }
+  @container (max-width: 640px) { .cell .cs { display: none; } .cell { align-items: center; justify-content: center; padding: 0; } .cell .s { letter-spacing: -.04em; } }
+  @media (max-width: 600px) { .board { padding: 8px; } }
 
   .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; color: var(--muted); font-size: .85rem; }
   .legend i { display: inline-block; width: .9em; height: .9em; border-radius: 3px; margin-right: 5px; vertical-align: -1px; border: 1px solid; }
@@ -168,6 +179,12 @@
   .clear { justify-self: start; min-height: 36px; padding: 4px 10px; font-size: .85rem; margin-top: 6px; }
   .field.disabled { opacity: .55; }
   .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  @media (max-width: 999px) {
+    html { scroll-padding-bottom: 84px; }
+    #form .actions button { padding: 9px 10px; flex: 1 1 auto; }
+    #form .actions .primary { flex: 2 1 110px; }
+    #form .actions { position: sticky; bottom: 0; z-index: 3; background: var(--surface); padding: 10px 0 4px; box-shadow: 0 -10px 10px -10px rgba(0, 0, 0, .35); }
+  }
   .actions .primary { flex: 1 1 140px; }
   .msg { padding: 10px 12px; border-radius: 8px; font-size: .95rem; display: none; }
   .msg.show { display: block; }
@@ -176,11 +193,12 @@
   .msg.info { background: var(--mid-bg); color: var(--mid); }
   .done { text-align: center; display: none; gap: 12px; }
   .done h2 { margin: 0; }
+  .done h2:focus { outline: none; }
   .done p { margin: 0; color: var(--muted); }
   .big { font-size: 2rem; font-weight: 800; line-height: 1.1; }
-  .saveForm { display: flex; gap: 8px; }
-  .saveForm button { white-space: nowrap; }
-  .saveForm input { flex: 1 1 auto; min-width: 0; background: var(--bg); border: 2px solid var(--line); border-radius: 8px; padding: 10px 12px; font-size: 1rem; }
+  .saveForm { display: flex; flex-wrap: wrap; gap: 8px; }
+  .saveForm button { white-space: nowrap; flex: 1 1 auto; }
+  .saveForm input { flex: 1 1 160px; width: 0; min-width: 0; background: var(--bg); border: 2px solid var(--line); border-radius: 8px; padding: 10px 12px; font-size: 1rem; }
   .rank { width: 100%; border-collapse: collapse; font-size: .9rem; text-align: left; }
   .rank th { color: var(--muted); font-weight: 500; font-size: .75rem; padding: 4px 6px; border-bottom: 1px solid var(--line); }
   .rank td { padding: 7px 6px; border-bottom: 1px solid var(--line); }
@@ -197,27 +215,27 @@
   .done.show { display: grid; }
   [hidden] { display: none !important; }
   .cell.cur.sym::after { content: none; }
-  .cell.cur .s { font-size: 1.9em; }
+  .cell.cur .s { font-size: max(11px, 1.9em); }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 </style>
 </head>
 <body>
-<div class="app">
+<main class="app">
   <header>
     <h1>Taula periòdica · Joc</h1>
     <div class="controls">
       <label class="sr" for="level">Nivell</label>
       <select id="level">
-        <option value="basic">Bàsic · veus el símbol → nom</option>
-        <option value="medium">Mitjà · símbol + nom</option>
-        <option value="adv">Avançat · símbol + nom + protons</option>
-        <option value="expert">Expert · tot (amb esquerra/dreta)</option>
+        <option value="basic">Nivell: Bàsic</option>
+        <option value="medium">Nivell: Mitjà</option>
+        <option value="adv">Nivell: Avançat</option>
+        <option value="expert">Nivell: Expert</option>
       </select>
       <label class="sr" for="order">Ordre</label>
       <select id="order">
         <option value="random">Ordre: aleatori</option>
-        <option value="rows">Ordre: per files</option>
-        <option value="cols">Ordre: per columnes</option>
+        <option value="rows">Ordre: files</option>
+        <option value="cols">Ordre: columnes</option>
       </select>
       <label class="sr" for="scope">Abast</label>
       <select id="scope">
@@ -231,16 +249,19 @@
       <button id="restart" type="button">Reinicia</button>
     </div>
   </header>
+  <p class="hint" id="levelHint"></p>
 
-  <section class="panel" aria-live="polite">
-    <div class="stats">
-      <span>Ronda: <b id="stDone">0</b>/<b id="stTotal">0</b></span>
-      <span>Al primer intent: <b id="stFirst">0</b></span>
+  <section class="panel">
+    <div id="prog" style="display:grid;gap:14px">
+      <div class="stats">
+        <span id="stProg"></span>
+        <span>Al primer intent: <b id="stFirst">0</b></span>
+      </div>
+      <div class="bar"><div id="bar"></div></div>
     </div>
-    <div class="bar"><div id="bar"></div></div>
 
     <div id="quiz">
-      <div class="where" id="where"></div>
+      <div class="where" id="where" aria-live="polite"></div>
       <form id="form" autocomplete="off" novalidate>
         <div class="field" id="fSym">
           <label for="inSym">Símbol</label>
@@ -284,7 +305,8 @@
       <div class="big" id="doneBig"></div>
       <p id="doneTxt"></p>
       <form class="saveForm" id="saveForm" autocomplete="off">
-        <input id="inPlayer" maxlength="20" placeholder="El teu nom" aria-label="El teu nom">
+        <label class="sr" for="inPlayer">Nom per al rànquing (si el deixes buit: Jugador)</label>
+        <input id="inPlayer" maxlength="20" placeholder="Nom (opcional)">
         <button class="primary" id="btnSave" type="submit">Desa al rànquing</button>
       </form>
       <p id="savedTxt" role="status"></p>
@@ -292,7 +314,7 @@
       <div id="doneRank"></div>
       <div class="actions">
         <button id="btnReview" type="button">Repassa els errors</button>
-        <button class="primary" id="btnAgain" type="button">Torna a jugar</button>
+        <button id="btnAgain" type="button">Torna a jugar</button>
       </div>
     </div>
   </section>
@@ -305,7 +327,7 @@
       <span><i style="background:var(--ko-bg);border-color:var(--ko)"></i>Solució / saltat</span>
     </div>
   </section>
-</div>
+</main>
 
 <dialog id="rankDlg" aria-labelledby="rankTitle">
   <h2 id="rankTitle">🏆 Rànquing per dificultat</h2>
@@ -400,6 +422,7 @@ function buildTable() {
 let queue = [], total = 0, doneCount = 0, firstTry = 0;
 let cur = null, attempts = 0, solved = false, requeued = new Set();
 // Primera ronda = cada casella resolta (o revelada) una vegada. Els salts i les solucions no compten com a encert.
+const lastSel = {};
 let n0 = 0, t0 = 0, resolved = new Set(), skippedSet = new Set();
 let round = null, roundDone = false, roundShown = false, savedEntry = null;
 
@@ -431,15 +454,32 @@ function start() {
   queue = list.map(e => e.z);
   total = queue.length; doneCount = 0; firstTry = 0; requeued = new Set(); cur = null;
   n0 = total; t0 = Date.now(); resolved = new Set(); skippedSet = new Set();
-  round = null; roundDone = false; roundShown = false; savedEntry = null;
+  round = null; roundDone = false; roundShown = false; savedEntry = null; reviewTotal = 0;
+  $('prog').hidden = false; $('levelHint').textContent = LEVEL_HINT[$('level').value];
+  for (const id of ['level', 'order', 'scope']) lastSel[id] = $(id).value;
   $('done').classList.remove('show'); $('quiz').style.display = '';
   updateStats(); next();
 }
 
+let reviewTotal = 0;
 function updateStats() {
-  $('stDone').textContent = doneCount; $('stTotal').textContent = total; $('stFirst').textContent = firstTry;
-  $('bar').style.width = total ? (100 * doneCount / total) + '%' : '0';
+  $('stFirst').textContent = firstTry;
+  if (!roundDone) {
+    $('stProg').innerHTML = 'Ronda: <b>' + resolved.size + '</b>/<b>' + n0 + '</b>';
+    $('bar').style.width = n0 ? (100 * resolved.size / n0) + '%' : '0';
+  } else {
+    const pending = queue.length + (cur && !solved ? 1 : 0);
+    $('stProg').innerHTML = 'Repàs: queden <b>' + pending + '</b>';
+    $('bar').style.width = reviewTotal ? (100 * (1 - pending / reviewTotal)) + '%' : '100%';
+  }
 }
+
+const LEVEL_HINT = {
+  basic: 'Bàsic: veus el símbol a la casella i escrius el nom.',
+  medium: 'Mitjà: veus només la casella i escrius símbol i nom.',
+  adv: 'Avançat: casella buida; escrius símbol, nom i protons.',
+  expert: 'Expert: casella buida; ho escrius tot, amb els +/− a esquerra o dreta i en ordre.',
+};
 
 function next() {
   if (cur) { const d = cellEls[cur.z]; if (d.classList.contains('cur')) setCell(cur.z, ''); }
@@ -464,7 +504,7 @@ function next() {
 
 function checkRound() {
   if (roundDone || resolved.size < n0) return;
-  roundDone = true;
+  roundDone = true; reviewTotal = queue.length;
   round = { level: $('level').value, scope: $('scope').value, order: $('order').value, n: n0, correct: firstTry, ms: Date.now() - t0 };
 }
 
@@ -570,8 +610,9 @@ function reveal() {
     zoneEl.l.classList.add('good'); zoneEl.r.classList.add('good');
   }
   setCell(cur.z, 'ko'); doneCount++;
-  resolved.add(cur.z); checkRound();
+  resolved.add(cur.z);
   if (!requeued.has(cur.z)) { requeued.add(cur.z); queue.push(cur.z); total++; }
+  checkRound();
   updateStats();
   solved = true;
   showMsg('Solució: ' + solutionText() + ' (tornarà a sortir al final)', 'info');
@@ -590,9 +631,14 @@ $('form').addEventListener('submit', e => {
 });
 $('btnSolve').addEventListener('click', () => { if (!solved) reveal(); });
 $('btnSkip').addEventListener('click', () => { if (!solved) skip(); });
-$('btnAgain').addEventListener('click', start);
-$('restart').addEventListener('click', start);
-for (const id of ['level', 'order', 'scope']) $(id).addEventListener('change', () => { saveSettings(); start(); });
+const unsaved = () => roundShown && round && !savedEntry;
+const DISCARD_MSG = 'Encara no has desat aquest resultat al rànquing. Vols començar de nou igualment?';
+$('btnAgain').addEventListener('click', () => { if (unsaved() && !confirm(DISCARD_MSG)) return; start(); });
+$('restart').addEventListener('click', () => { if (unsaved() && !confirm(DISCARD_MSG)) return; start(); });
+for (const id of ['level', 'order', 'scope']) $(id).addEventListener('change', () => {
+  if (unsaved() && !confirm(DISCARD_MSG)) { for (const k of ['level', 'order', 'scope']) $(k).value = lastSel[k]; return; }
+  saveSettings(); start();
+});
 
 
 // ---------- Rànquing (guardat al navegador d'aquest dispositiu) ----------
@@ -632,7 +678,8 @@ function showResults() {
   const first = !roundShown; roundShown = true;
   if (!round) checkRound();
   const R = round;
-  $('quiz').style.display = 'none'; $('done').classList.add('show');
+  $('quiz').style.display = 'none'; $('done').classList.add('show'); $('prog').hidden = true;
+  $('btnAgain').classList.toggle('primary', !!savedEntry);
   $('doneTitle').textContent = first ? 'Primera ronda acabada! 🎉' : 'Repàs acabat 👏';
   $('doneBig').textContent = R.correct + '/' + R.n + ' · ' + pct(R.correct, R.n) + '%';
   $('doneTxt').textContent = 'Nivell ' + LEVEL_NAME[R.level] + ' · ' + scopeName(R.scope) + ' · ' + fmtTime(R.ms) + ' · al primer intent';
@@ -642,7 +689,7 @@ function showResults() {
   updateDoneRank();
   $('btnReview').style.display = queue.length ? '' : 'none';
   $('btnReview').textContent = 'Repassa els errors (' + queue.length + ')';
-  updateStats();
+  $('doneTitle').tabIndex = -1; $('doneTitle').focus({ preventScroll: true });
 }
 function updateDoneRank() {
   const R = round;
@@ -668,11 +715,11 @@ $('saveForm').addEventListener('submit', e => {
   rankMem = rankMem.filter(x => x.level !== round.level || x.scope !== round.scope || keep.has(x.id));
   const ok = persistRank();
   try { localStorage.setItem(PLAYER_KEY, name); } catch (e) {}
-  $('btnSave').disabled = true; $('btnSave').textContent = 'Desat ✓';
+  $('btnSave').disabled = true; $('btnSave').textContent = 'Desat ✓'; $('btnAgain').classList.add('primary');
   updateDoneRank();
   if (!ok) $('savedTxt').textContent += ' (No s\'ha pogut desar al navegador: es perdrà en tancar.)';
 });
-$('btnReview').addEventListener('click', () => { $('done').classList.remove('show'); $('quiz').style.display = ''; next(); });
+$('btnReview').addEventListener('click', () => { $('done').classList.remove('show'); $('quiz').style.display = ''; $('prog').hidden = false; next(); updateStats(); });
 
 // Diàleg del rànquing (tots els nivells)
 const dlg = $('rankDlg');
