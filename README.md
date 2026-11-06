@@ -28,6 +28,14 @@ grups principals, metalls de transició).
 Aleatori, **per files** (període a període, d'esquerra a dreta) o **per columnes** (grup a grup, de dalt a baix).
 El nivell, l'ordre i l'abast es recorden al navegador.
 
+## Rànquing
+
+En acabar la **primera ronda** (totes les caselles resoltes una vegada) apareix el resultat i pots desar-lo amb el teu nom.
+Hi ha un rànquing **per nivell** (i per abast, perquè 47 caselles i 20 no són comparables). S'ordena per encerts al primer intent
+i, en cas d'empat, per temps. Les caselles saltades o revelades no compten com a encert; després pots repassar els errors.
+El rànquing es guarda al navegador del dispositiu (no hi ha servidor): el mòbil i l'ordinador tenen rànquings separats.
+Es pot consultar en qualsevol moment amb el botó 🏆 Rànquing.
+
 ## Ús
 
 Obre `index.html` al navegador.

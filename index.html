@@ -64,7 +64,8 @@
   h1 { font-size: 1.4rem; margin: 0; }
   .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .controls select { flex: 1 1 150px; min-width: 0; }
-  @media (max-width: 600px) { .controls { width: 100%; } .controls button { flex: 1 1 100%; min-height: 40px; } header { gap: 8px; } }
+  .controls button { flex: 0 0 auto; }
+  @media (max-width: 600px) { .controls { width: 100%; } .controls button { flex: 1 1 45%; min-height: 40px; } header { gap: 8px; } }
   select, button, input { font: inherit; color: inherit; }
   select {
     background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
@@ -173,8 +174,26 @@
   .msg.good { background: var(--ok-bg); color: var(--ok); }
   .msg.bad { background: var(--ko-bg); color: var(--ko); }
   .msg.info { background: var(--mid-bg); color: var(--mid); }
-  .done { text-align: center; display: none; gap: 10px; }
+  .done { text-align: center; display: none; gap: 12px; }
   .done h2 { margin: 0; }
+  .done p { margin: 0; color: var(--muted); }
+  .big { font-size: 2rem; font-weight: 800; line-height: 1.1; }
+  .saveForm { display: flex; gap: 8px; }
+  .saveForm button { white-space: nowrap; }
+  .saveForm input { flex: 1 1 auto; min-width: 0; background: var(--bg); border: 2px solid var(--line); border-radius: 8px; padding: 10px 12px; font-size: 1rem; }
+  .rank { width: 100%; border-collapse: collapse; font-size: .9rem; text-align: left; }
+  .rank th { color: var(--muted); font-weight: 500; font-size: .75rem; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+  .rank td { padding: 7px 6px; border-bottom: 1px solid var(--line); }
+  .rank td:first-child, .rank th:first-child { width: 2em; text-align: center; }
+  .rank td.r, .rank th.r { text-align: right; white-space: nowrap; }
+  .rank tr.me td { background: var(--ok-bg); font-weight: 700; }
+  .rank .nm { overflow-wrap: anywhere; }
+  .rankhead { color: var(--muted); font-size: .8rem; text-align: left; }
+  .empty { color: var(--muted); font-size: .9rem; padding: 8px 0; }
+  dialog { background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 14px; padding: 16px; width: min(480px, calc(100vw - 32px)); max-height: calc(100vh - 32px); }
+  dialog::backdrop { background: rgba(0, 0, 0, .5); }
+  dialog h2 { margin: 0 0 10px; font-size: 1.2rem; }
+  .rankSel { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
   .done.show { display: grid; }
   [hidden] { display: none !important; }
   .cell.cur.sym::after { content: none; }
@@ -208,6 +227,7 @@
         <option value="main">Només grups principals</option>
         <option value="trans">Només metalls de transició</option>
       </select>
+      <button id="btnRank" type="button">🏆 Rànquing</button>
       <button id="restart" type="button">Reinicia</button>
     </div>
   </header>
@@ -260,9 +280,20 @@
     </div>
 
     <div class="done" id="done">
-      <h2>Taula completada! 🎉</h2>
+      <h2 id="doneTitle">Primera ronda acabada! 🎉</h2>
+      <div class="big" id="doneBig"></div>
       <p id="doneTxt"></p>
-      <button class="primary" id="btnAgain" type="button">Torna a jugar</button>
+      <form class="saveForm" id="saveForm" autocomplete="off">
+        <input id="inPlayer" maxlength="20" placeholder="El teu nom" aria-label="El teu nom">
+        <button class="primary" id="btnSave" type="submit">Desa al rànquing</button>
+      </form>
+      <p id="savedTxt" role="status"></p>
+      <div class="rankhead" id="doneRankHead"></div>
+      <div id="doneRank"></div>
+      <div class="actions">
+        <button id="btnReview" type="button">Repassa els errors</button>
+        <button class="primary" id="btnAgain" type="button">Torna a jugar</button>
+      </div>
     </div>
   </section>
 
@@ -275,6 +306,19 @@
     </div>
   </section>
 </div>
+
+<dialog id="rankDlg" aria-labelledby="rankTitle">
+  <h2 id="rankTitle">🏆 Rànquing per dificultat</h2>
+  <div class="rankSel">
+    <select id="rkLevel" aria-label="Nivell"></select>
+    <select id="rkScope" aria-label="Abast"></select>
+  </div>
+  <div id="rankBox"></div>
+  <div class="actions" style="margin-top:12px">
+    <button type="button" id="btnRankClear">Esborra aquest rànquing</button>
+    <button type="button" class="primary" id="btnRankClose">Tanca</button>
+  </div>
+</dialog>
 
 <script>
 'use strict';
@@ -355,6 +399,9 @@ function buildTable() {
 // ---------- Estat del joc ----------
 let queue = [], total = 0, doneCount = 0, firstTry = 0;
 let cur = null, attempts = 0, solved = false, requeued = new Set();
+// Primera ronda = cada casella resolta (o revelada) una vegada. Els salts i les solucions no compten com a encert.
+let n0 = 0, t0 = 0, resolved = new Set(), skippedSet = new Set();
+let round = null, roundDone = false, roundShown = false, savedEntry = null;
 
 function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 
@@ -383,6 +430,8 @@ function start() {
   else shuffle(list);
   queue = list.map(e => e.z);
   total = queue.length; doneCount = 0; firstTry = 0; requeued = new Set(); cur = null;
+  n0 = total; t0 = Date.now(); resolved = new Set(); skippedSet = new Set();
+  round = null; roundDone = false; roundShown = false; savedEntry = null;
   $('done').classList.remove('show'); $('quiz').style.display = '';
   updateStats(); next();
 }
@@ -394,7 +443,8 @@ function updateStats() {
 
 function next() {
   if (cur) { const d = cellEls[cur.z]; if (d.classList.contains('cur')) setCell(cur.z, ''); }
-  if (!queue.length) return finish();
+  if (roundDone && !roundShown) return showResults();
+  if (!queue.length) return showResults();
   cur = BY_Z[queue.shift()]; attempts = 0; solved = false;
   const [r, c] = pos(cur.z);
   const L = lv();
@@ -412,10 +462,10 @@ function next() {
   (L.sym ? $('inSym') : $('inName')).focus({ preventScroll: true });
 }
 
-function finish() {
-  $('quiz').style.display = 'none'; $('done').classList.add('show');
-  $('doneTxt').textContent = 'Has encertat ' + firstTry + ' de ' + total + ' caselles al primer intent.';
-  updateStats();
+function checkRound() {
+  if (roundDone || resolved.size < n0) return;
+  roundDone = true;
+  round = { level: $('level').value, scope: $('scope').value, order: $('order').value, n: n0, correct: firstTry, ms: Date.now() - t0 };
 }
 
 // ---------- Entrada ----------
@@ -493,7 +543,8 @@ function check() {
   if ((!L.sym || r.sym) && (!L.name || r.name) && (!L.z || r.z) && (!L.ch || r.ch)) {
     solved = true;
     const first = attempts === 1;
-    if (first) firstTry++;
+    if (first && !resolved.has(cur.z) && !skippedSet.has(cur.z)) firstTry++;
+    resolved.add(cur.z); checkRound();
     setCell(cur.z, first ? 'ok' : 'mid'); doneCount++; updateStats();
     showMsg((first ? 'Correcte! ' : 'Ja ho tens! ') + solutionText(), 'good');
     toNextMode();
@@ -503,6 +554,7 @@ function check() {
 }
 
 function skip() {
+  skippedSet.add(cur.z);
   queue.push(cur.z);
   next();
 }
@@ -518,6 +570,7 @@ function reveal() {
     zoneEl.l.classList.add('good'); zoneEl.r.classList.add('good');
   }
   setCell(cur.z, 'ko'); doneCount++;
+  resolved.add(cur.z); checkRound();
   if (!requeued.has(cur.z)) { requeued.add(cur.z); queue.push(cur.z); total++; }
   updateStats();
   solved = true;
@@ -526,7 +579,7 @@ function reveal() {
 }
 
 function toNextMode() {
-  $('btnMain').textContent = queue.length ? 'Següent' : 'Acaba';
+  $('btnMain').textContent = (roundDone && !roundShown) ? 'Veure resultats' : (queue.length ? 'Següent' : 'Acaba');
   $('btnSolve').disabled = true; $('btnSkip').disabled = true;
   $('btnMain').focus({ preventScroll: true });
 }
@@ -540,6 +593,105 @@ $('btnSkip').addEventListener('click', () => { if (!solved) skip(); });
 $('btnAgain').addEventListener('click', start);
 $('restart').addEventListener('click', start);
 for (const id of ['level', 'order', 'scope']) $(id).addEventListener('change', () => { saveSettings(); start(); });
+
+
+// ---------- Rànquing (guardat al navegador d'aquest dispositiu) ----------
+const RANK_KEY = 'taulaperiodica.ranking.v1', PLAYER_KEY = 'taulaperiodica.player';
+const LEVEL_NAME = { basic: 'Bàsic', medium: 'Mitjà', adv: 'Avançat', expert: 'Expert' };
+let rankMem = [];
+try { const a = JSON.parse(localStorage.getItem(RANK_KEY) || '[]'); if (Array.isArray(a)) rankMem = a; } catch (e) {}
+function persistRank() { try { localStorage.setItem(RANK_KEY, JSON.stringify(rankMem)); return true; } catch (e) { return false; } }
+const cmpRun = (a, b) => (b.correct / b.n) - (a.correct / a.n) || (a.ms / a.n) - (b.ms / b.n) || a.t - b.t;
+const entriesFor = (level, scope) => rankMem.filter(e => e.level === level && e.scope === scope).sort(cmpRun);
+const fmtTime = ms => { const t = Math.round(ms / 1000); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); };
+const pct = (c, n) => Math.round(100 * c / n);
+const scopeName = v => { const o = [...$('scope').options].find(o => o.value === v); return o ? o.textContent : v; };
+
+function renderRank(box, level, scope, hiId) {
+  box.replaceChildren();
+  const list = entriesFor(level, scope);
+  if (!list.length) { const d = document.createElement('div'); d.className = 'empty'; d.textContent = 'Encara no hi ha cap resultat en aquest nivell.'; box.appendChild(d); return; }
+  const tbl = document.createElement('table'); tbl.className = 'rank';
+  const head = document.createElement('tr');
+  for (const [t, cls] of [['#', ''], ['Nom', ''], ['Encerts', 'r'], ['Temps', 'r']]) { const th = document.createElement('th'); th.textContent = t; if (cls) th.className = cls; head.appendChild(th); }
+  tbl.appendChild(head);
+  const rows = list.map((e, i) => ({ e, pos: i + 1 }));
+  let shown = rows.slice(0, 10);
+  const me = rows.find(r => r.e.id === hiId);
+  if (me && !shown.includes(me)) shown = shown.concat(me);
+  for (const { e, pos } of shown) {
+    const tr = document.createElement('tr'); if (e.id === hiId) tr.className = 'me';
+    const cells = [[pos, ''], [e.name, 'nm'], [e.correct + '/' + e.n + ' · ' + pct(e.correct, e.n) + '%', 'r'], [fmtTime(e.ms), 'r']];
+    for (const [t, cls] of cells) { const td = document.createElement('td'); td.textContent = t; if (cls) td.className = cls; tr.appendChild(td); }
+    tbl.appendChild(tr);
+  }
+  box.appendChild(tbl);
+}
+
+function showResults() {
+  const first = !roundShown; roundShown = true;
+  if (!round) checkRound();
+  const R = round;
+  $('quiz').style.display = 'none'; $('done').classList.add('show');
+  $('doneTitle').textContent = first ? 'Primera ronda acabada! 🎉' : 'Repàs acabat 👏';
+  $('doneBig').textContent = R.correct + '/' + R.n + ' · ' + pct(R.correct, R.n) + '%';
+  $('doneTxt').textContent = 'Nivell ' + LEVEL_NAME[R.level] + ' · ' + scopeName(R.scope) + ' · ' + fmtTime(R.ms) + ' · al primer intent';
+  $('inPlayer').value = (() => { try { return localStorage.getItem(PLAYER_KEY) || ''; } catch (e) { return ''; } })();
+  $('btnSave').disabled = !!savedEntry; $('btnSave').textContent = savedEntry ? 'Desat ✓' : 'Desa al rànquing';
+  $('saveForm').style.display = '';
+  updateDoneRank();
+  $('btnReview').style.display = queue.length ? '' : 'none';
+  $('btnReview').textContent = 'Repassa els errors (' + queue.length + ')';
+  updateStats();
+}
+function updateDoneRank() {
+  const R = round;
+  let preview = '';
+  if (!savedEntry) {
+    const better = entriesFor(R.level, R.scope).filter(e => cmpRun(e, R) < 0).length;
+    preview = 'Si el deses, quedaràs en la posició ' + (better + 1) + '.';
+  } else {
+    preview = 'Posició ' + (entriesFor(R.level, R.scope).findIndex(e => e.id === savedEntry.id) + 1) + ' al rànquing.';
+  }
+  $('savedTxt').textContent = preview;
+  $('doneRankHead').textContent = 'Rànquing · ' + LEVEL_NAME[R.level] + ' · ' + scopeName(R.scope);
+  renderRank($('doneRank'), R.level, R.scope, savedEntry && savedEntry.id);
+}
+$('saveForm').addEventListener('submit', e => {
+  e.preventDefault();
+  if (savedEntry || !round) return;
+  const name = $('inPlayer').value.trim() || 'Jugador';
+  savedEntry = { id: Date.now() + '-' + Math.random().toString(36).slice(2, 6), t: Date.now(), name, level: round.level, scope: round.scope, order: round.order, n: round.n, correct: round.correct, ms: round.ms };
+  rankMem.push(savedEntry);
+  // màxim 100 resultats per nivell i abast
+  const keep = new Set(entriesFor(round.level, round.scope).slice(0, 100).map(x => x.id));
+  rankMem = rankMem.filter(x => x.level !== round.level || x.scope !== round.scope || keep.has(x.id));
+  const ok = persistRank();
+  try { localStorage.setItem(PLAYER_KEY, name); } catch (e) {}
+  $('btnSave').disabled = true; $('btnSave').textContent = 'Desat ✓';
+  updateDoneRank();
+  if (!ok) $('savedTxt').textContent += ' (No s\'ha pogut desar al navegador: es perdrà en tancar.)';
+});
+$('btnReview').addEventListener('click', () => { $('done').classList.remove('show'); $('quiz').style.display = ''; next(); });
+
+// Diàleg del rànquing (tots els nivells)
+const dlg = $('rankDlg');
+for (const o of $('level').options) $('rkLevel').add(new Option(LEVEL_NAME[o.value], o.value));
+for (const o of $('scope').options) $('rkScope').add(new Option(o.textContent, o.value));
+const drawDlg = () => renderRank($('rankBox'), $('rkLevel').value, $('rkScope').value, null);
+$('btnRank').addEventListener('click', () => {
+  $('rkLevel').value = $('level').value; $('rkScope').value = $('scope').value; drawDlg();
+  if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
+});
+$('rkLevel').addEventListener('change', drawDlg); $('rkScope').addEventListener('change', drawDlg);
+$('btnRankClose').addEventListener('click', () => dlg.close());
+$('btnRankClear').addEventListener('click', () => {
+  const lv_ = $('rkLevel').value, sc = $('rkScope').value;
+  if (!entriesFor(lv_, sc).length) return;
+  if (!confirm('Vols esborrar el rànquing ' + LEVEL_NAME[lv_] + ' · ' + $('rkScope').selectedOptions[0].textContent + '?')) return;
+  rankMem = rankMem.filter(x => x.level !== lv_ || x.scope !== sc); persistRank(); drawDlg();
+  if (round && round.level === lv_ && round.scope === sc) { savedEntry = null; if ($('done').classList.contains('show')) showResults(); }
+});
 
 buildTable();
 start();
