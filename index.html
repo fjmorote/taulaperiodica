@@ -137,6 +137,9 @@
   .stats b { color: var(--ink); }
   .bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
   .bar > div { height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+  .jump { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; color: var(--muted); font-size: .9rem; }
+  .jump b { color: var(--ink); }
+  .jump select { flex: 1 1 170px; min-width: 0; }
   .where { font-weight: 600; font-size: 1.05rem; }
   .where small { display: block; font-weight: 400; color: var(--muted); font-size: .85rem; }
   form { display: grid; gap: 12px; }
@@ -261,6 +264,11 @@
     </div>
 
     <div id="quiz">
+      <div class="jump" id="jump" hidden>
+        <span id="jumpCur"></span>
+        <label class="sr" for="jumpSel" id="jumpLbl">Canvia de fila</label>
+        <select id="jumpSel"></select>
+      </div>
       <div class="where" id="where" aria-live="polite"></div>
       <form id="form" autocomplete="off" novalidate>
         <div class="field" id="fSym">
@@ -462,8 +470,39 @@ function start() {
 }
 
 let reviewTotal = 0;
+const unitOf = z => ($('order').value === 'rows' ? pos(z)[0] : pos(z)[1]);
+const unitName = () => ($('order').value === 'rows' ? 'Fila' : 'Columna');
+
+// Selector per canviar de fila/columna (només amb ordre per files o per columnes, durant la primera ronda)
+function updateJump() {
+  const mode = $('order').value;
+  const on = (mode === 'rows' || mode === 'cols') && !roundDone && n0 > 0;
+  $('jump').hidden = !on;
+  if (!on) return;
+  const inScope = SCOPES[$('scope').value], pend = {};
+  for (const e of ELS) if (inScope(e.z) && !resolved.has(e.z)) { const u = unitOf(e.z); pend[u] = (pend[u] || 0) + 1; }
+  $('jumpCur').innerHTML = cur ? unitName() + ' <b>' + unitOf(cur.z) + '</b>' : '';
+  const word = mode === 'rows' ? 'fila' : 'columna';
+  $('jumpLbl').textContent = 'Canvia de ' + word;
+  const sel = $('jumpSel');
+  sel.replaceChildren(new Option('Canvia de ' + word + '…', ''));
+  for (const u of Object.keys(pend).map(Number).sort((a, b) => a - b))
+    sel.add(new Option(unitName() + ' ' + u + ' · ' + pend[u] + (pend[u] === 1 ? ' pendent' : ' pendents'), u));
+  sel.value = '';
+}
+function jumpTo(u) {
+  const inScope = SCOPES[$('scope').value], rows = $('order').value === 'rows';
+  const ord = (a, b) => { const pa = pos(a), pb = pos(b); return rows ? pa[0] - pb[0] || pa[1] - pb[1] : pa[1] - pb[1] || pa[0] - pb[0]; };
+  const fresh = ELS.filter(e => inScope(e.z) && !resolved.has(e.z)).map(e => e.z).sort(ord);
+  const review = queue.filter(z => resolved.has(z));
+  queue = fresh.filter(z => unitOf(z) >= u).concat(fresh.filter(z => unitOf(z) < u), review);
+  next();
+}
+$('jumpSel').addEventListener('change', e => { const u = +e.target.value; if (u) jumpTo(u); });
+
 function updateStats() {
   $('stFirst').textContent = firstTry;
+  updateJump();
   if (!roundDone) {
     $('stProg').innerHTML = 'Ronda: <b>' + resolved.size + '</b>/<b>' + n0 + '</b>';
     $('bar').style.width = n0 ? (100 * resolved.size / n0) + '%' : '0';
@@ -499,6 +538,7 @@ function next() {
   zoneEl.l.classList.remove('good', 'bad'); zoneEl.r.classList.remove('good', 'bad');
   showMsg('');
   $('btnMain').textContent = 'Comprova'; $('btnSolve').disabled = false; $('btnSkip').disabled = false;
+  updateJump();
   (L.sym ? $('inSym') : $('inName')).focus({ preventScroll: true });
 }
 

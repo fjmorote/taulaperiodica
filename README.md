@@ -36,6 +36,16 @@ i, en cas d'empat, per temps. Les caselles saltades o revelades no compten com a
 El rànquing es guarda al navegador del dispositiu (no hi ha servidor): el mòbil i l'ordinador tenen rànquings separats.
 Es pot consultar en qualsevol moment amb el botó 🏆 Rànquing.
 
+## Canviar de fila o columna
+
+Amb l'ordre **per files** o **per columnes**, a la pregunta hi ha un selector «Canvia de fila…» (o columna) amb les que encara tenen caselles pendents.
+Pots començar per la que vulguis: continua en ordre fins al final i torna a l'inici per les que s'havien saltat.
+
+## Desplegament
+
+Es publica amb GitHub Pages directament des de `main` (carpeta arrel): cada `git push` a `main` es desplega sol.
+Només cal activar-ho un cop a *Settings → Pages → Source: Deploy from a branch → `main` / `(root)`*.
+
 ## Ús
 
 Obre `index.html` al navegador.
