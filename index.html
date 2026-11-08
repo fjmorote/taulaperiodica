@@ -66,9 +66,19 @@
   .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .controls select { flex: 1 1 150px; min-width: 0; }
   .controls button { flex: 0 0 auto; }
+  .chk { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; cursor: pointer; user-select: none; }
+  .chk input { width: 20px; height: 20px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+  .chk:hover { border-color: var(--accent); }
+  #restart .short { display: none; }
   @media (max-width: 600px) {
-    .controls { width: 100%; display: grid; grid-template-columns: 1fr 1fr; }
+    .controls { width: 100%; display: grid; grid-template-columns: repeat(12, 1fr); }
+    .controls #level, .controls #order { grid-column: span 6; }
     .controls #scope { grid-column: 1 / -1; }
+    .controls .chk { grid-column: span 5; padding: 0 10px; }
+    .controls #btnRank { grid-column: span 5; padding: 9px 6px; }
+    .controls #restart { grid-column: span 2; padding: 9px 0; }
+    #restart .long { display: none; }
+    #restart .short { display: inline; font-size: 1.3rem; line-height: 1; }
     header { gap: 8px; }
   }
   .hint { grid-column: 1 / -1; margin: -8px 0 0; color: var(--muted); font-size: .9rem; }
@@ -248,8 +258,9 @@
         <option value="main">Només grups principals</option>
         <option value="trans">Només metalls de transició</option>
       </select>
+      <label class="chk" title="Demana també els protons"><input type="checkbox" id="chkZ"><span>Protons</span></label>
       <button id="btnRank" type="button">🏆 Rànquing</button>
-      <button id="restart" type="button">Reinicia</button>
+      <button id="restart" type="button" aria-label="Reinicia"><span class="long">Reinicia</span><span class="short" aria-hidden="true">↻</span></button>
     </div>
   </header>
   <p class="hint" id="levelHint"></p>
@@ -276,6 +287,11 @@
           <input type="text" id="inSym" maxlength="3" autocapitalize="off" autocorrect="off" spellcheck="false">
           <div class="note"></div>
         </div>
+        <div class="field" id="fName">
+          <label for="inName">Nom (en català)</label>
+          <input type="text" id="inName" autocapitalize="off" autocorrect="off" spellcheck="false">
+          <div class="note"></div>
+        </div>
         <div class="field" id="fCh">
           <span class="lbl" id="lblCh">+/− · toca una columna i afegeix-hi els valors en l'ordre de la taula (de dalt a baix)</span>
           <div class="zones" role="group" aria-labelledby="lblCh">
@@ -287,11 +303,6 @@
             <div class="chiprow" id="chPos"></div>
           </div>
           <button type="button" class="clear" id="btnClear">Esborra la columna seleccionada</button>
-          <div class="note"></div>
-        </div>
-        <div class="field" id="fName">
-          <label for="inName">Nom (en català)</label>
-          <input type="text" id="inName" autocapitalize="off" autocorrect="off" spellcheck="false">
           <div class="note"></div>
         </div>
         <div class="field" id="fZ">
@@ -400,15 +411,30 @@ const LEVELS = {
 };
 
 const $ = id => document.getElementById(id);
-const lv = () => LEVELS[$('level').value];
+const LEVEL_Z = { basic: false, medium: false, adv: true, expert: true };
+const lv = () => Object.assign({}, LEVELS[$('level').value], { z: $('chkZ').checked });
+// «Avançat» és «Mitjà + protons»: el nivell i el check s'han de mantenir coherents
+function syncLevelToZ() {
+  const l = $('level').value, z = $('chkZ').checked;
+  if (l === 'medium' && z) $('level').value = 'adv';
+  else if (l === 'adv' && !z) $('level').value = 'medium';
+}
+function diffKey() {
+  const l = $('level').value, z = $('chkZ').checked;
+  if (l === 'basic') return z ? 'basicz' : 'basic';
+  if (l === 'expert') return z ? 'expert' : 'expertnz';
+  return z ? 'adv' : 'medium';
+}
 const SETTINGS_KEY = 'taulaperiodica.v1';
 try {
   const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
   for (const id of ['level', 'order', 'scope'])
     if (saved[id] && [...$(id).options].some(o => o.value === saved[id])) $(id).value = saved[id];
-} catch (e) { /* sense emmagatzematge: no passa res */ }
+  $('chkZ').checked = typeof saved.z === 'boolean' ? saved.z : LEVEL_Z[$('level').value];
+} catch (e) { $('chkZ').checked = LEVEL_Z[$('level').value]; }
+syncLevelToZ();
 function saveSettings() {
-  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ level: $('level').value, order: $('order').value, scope: $('scope').value })); } catch (e) {}
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ level: $('level').value, order: $('order').value, scope: $('scope').value, z: $('chkZ').checked })); } catch (e) {}
 }
 const tableEl = $('table');
 const cellEls = {};
@@ -463,8 +489,9 @@ function start() {
   total = queue.length; doneCount = 0; firstTry = 0; requeued = new Set(); cur = null;
   n0 = total; t0 = Date.now(); resolved = new Set(); skippedSet = new Set();
   round = null; roundDone = false; roundShown = false; savedEntry = null; reviewTotal = 0;
-  $('prog').hidden = false; $('levelHint').textContent = LEVEL_HINT[$('level').value];
+  $('prog').hidden = false; $('levelHint').textContent = levelHint();
   for (const id of ['level', 'order', 'scope']) lastSel[id] = $(id).value;
+  lastSel.z = $('chkZ').checked;
   $('done').classList.remove('show'); $('quiz').style.display = '';
   updateStats(); next();
 }
@@ -513,6 +540,10 @@ function updateStats() {
   }
 }
 
+function levelHint() {
+  const l = $('level').value, z = $('chkZ').checked;
+  return LEVEL_HINT[l] + (!LEVEL_Z[l] && z ? ' També els protons.' : '') + (LEVEL_Z[l] && !z ? ' Sense protons.' : '');
+}
 const LEVEL_HINT = {
   basic: 'Bàsic: veus el símbol a la casella i escrius el nom.',
   medium: 'Mitjà: veus només la casella i escrius símbol i nom.',
@@ -545,7 +576,7 @@ function next() {
 function checkRound() {
   if (roundDone || resolved.size < n0) return;
   roundDone = true; reviewTotal = queue.length;
-  round = { level: $('level').value, scope: $('scope').value, order: $('order').value, n: n0, correct: firstTry, ms: Date.now() - t0 };
+  round = { level: diffKey(), scope: $('scope').value, order: $('order').value, n: n0, correct: firstTry, ms: Date.now() - t0 };
 }
 
 // ---------- Entrada ----------
@@ -606,7 +637,7 @@ function grade() {
 
 function solutionText() {
   const f = a => a.length ? a.map(fmtCh).join(' ') : '—';
-  return cur.sym + ' · ' + cur.name + ' · ' + cur.z + ' protons · esquerra: ' + f(cur.l) + ' · dreta: ' + f(cur.r);
+  return cur.sym + ' · ' + cur.name + ' · esquerra: ' + f(cur.l) + ' · dreta: ' + f(cur.r) + ' · ' + cur.z + ' protons';
 }
 
 function check() {
@@ -675,15 +706,19 @@ const unsaved = () => roundShown && round && !savedEntry;
 const DISCARD_MSG = 'Encara no has desat aquest resultat al rànquing. Vols començar de nou igualment?';
 $('btnAgain').addEventListener('click', () => { if (unsaved() && !confirm(DISCARD_MSG)) return; start(); });
 $('restart').addEventListener('click', () => { if (unsaved() && !confirm(DISCARD_MSG)) return; start(); });
-for (const id of ['level', 'order', 'scope']) $(id).addEventListener('change', () => {
-  if (unsaved() && !confirm(DISCARD_MSG)) { for (const k of ['level', 'order', 'scope']) $(k).value = lastSel[k]; return; }
-  saveSettings(); start();
-});
-
+const restoreSel = () => { for (const k of ['level', 'order', 'scope']) $(k).value = lastSel[k]; $('chkZ').checked = lastSel.z; };
+const changed = fn => () => {
+  if (unsaved() && !confirm(DISCARD_MSG)) return restoreSel();
+  fn(); saveSettings(); start();
+};
+$('level').addEventListener('change', changed(() => { $('chkZ').checked = LEVEL_Z[$('level').value]; }));
+$('order').addEventListener('change', changed(() => {}));
+$('scope').addEventListener('change', changed(() => {}));
+$('chkZ').addEventListener('change', changed(syncLevelToZ));
 
 // ---------- Rànquing (guardat al navegador d'aquest dispositiu) ----------
 const RANK_KEY = 'taulaperiodica.ranking.v1', PLAYER_KEY = 'taulaperiodica.player';
-const LEVEL_NAME = { basic: 'Bàsic', medium: 'Mitjà', adv: 'Avançat', expert: 'Expert' };
+const LEVEL_NAME = { basic: 'Bàsic', basicz: 'Bàsic + protons', medium: 'Mitjà', adv: 'Avançat', expertnz: 'Expert sense protons', expert: 'Expert' };
 let rankMem = [];
 try { const a = JSON.parse(localStorage.getItem(RANK_KEY) || '[]'); if (Array.isArray(a)) rankMem = a; } catch (e) {}
 function persistRank() { try { localStorage.setItem(RANK_KEY, JSON.stringify(rankMem)); return true; } catch (e) { return false; } }
@@ -763,11 +798,11 @@ $('btnReview').addEventListener('click', () => { $('done').classList.remove('sho
 
 // Diàleg del rànquing (tots els nivells)
 const dlg = $('rankDlg');
-for (const o of $('level').options) $('rkLevel').add(new Option(LEVEL_NAME[o.value], o.value));
+for (const k of Object.keys(LEVEL_NAME)) $('rkLevel').add(new Option(LEVEL_NAME[k], k));
 for (const o of $('scope').options) $('rkScope').add(new Option(o.textContent, o.value));
 const drawDlg = () => renderRank($('rankBox'), $('rkLevel').value, $('rkScope').value, null);
 $('btnRank').addEventListener('click', () => {
-  $('rkLevel').value = $('level').value; $('rkScope').value = $('scope').value; drawDlg();
+  $('rkLevel').value = diffKey(); $('rkScope').value = $('scope').value; drawDlg();
   if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
 });
 $('rkLevel').addEventListener('change', drawDlg); $('rkScope').addEventListener('change', drawDlg);
