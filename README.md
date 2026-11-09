@@ -1,7 +1,10 @@
 # Taula periòdica · Joc
 
-App web (un sol fitxer, sense dependències) per practicar la taula periòdica dels
-estats d'oxidació / càrregues dels ions (47 elements, els de la taula del full).
+App web (un sol fitxer, sense dependències) per practicar la taula periòdica: símbol, nom en català,
+protons i estats d'oxidació / càrregues dels ions.
+
+Hi ha dues taules (selector d'abast): la **taula del full** (47 elements, amb els valors exactes del full) i la
+**taula completa** (118 elements).
 
 L'app il·lumina una casella a l'atzar i has d'omplir:
 
@@ -12,7 +15,14 @@ L'app il·lumina una casella a l'atzar i has d'omplir:
 
 Les caselles s'acoloreixen segons el resultat (al primer intent / amb errors / solució)
 i les que falles tornen a sortir al final. Es pot limitar l'abast (períodes 1–3, 1–4,
-grups principals, metalls de transició).
+grups principals, metalls de transició, lantànids i actínids).
+
+## Elements fora del full
+
+Els 71 elements que no surten al full tenen valors **orientatius** (els estats d'oxidació habituals, de coneixement de química):
+d'aquests només es comprova el **conjunt** de valors, sense costat esquerra/dreta ni ordre.
+Els gasos nobles i els elements 109–118 (sense química fiable) no demanen +/−.
+Es poden corregir a l'array `DATA` d'`index.html` (6è valor: 1 = orientatiu, 2 = sense +/−).
 
 ## Nivells
 

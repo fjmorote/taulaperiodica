@@ -104,11 +104,16 @@
   .board { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px; container-type: inline-size; }
   .table {
     display: grid;
-    grid-template-columns: max(1.2em, 12px) repeat(17, minmax(0, 1fr));
-    grid-template-rows: max(1.2em, 12px) repeat(6, auto);
+    --cols: 18; --n: 19;
+    grid-template-columns: max(1.2em, 12px) repeat(var(--cols), minmax(0, 1fr));
+    grid-template-rows: max(1.2em, 12px) repeat(7, auto) 0.5em repeat(2, auto);
     gap: 2px;
-    font-size: calc(100cqw / 18 * 0.26);
+    font-size: calc(100cqw / var(--n) * 0.26);
   }
+  .table.sheet { --cols: 17; --n: 18; grid-template-rows: max(1.2em, 12px) repeat(6, auto); }
+  .cell.gone { display: none; }
+  .cell.ph { background: transparent; border: 1px dashed var(--line); color: var(--muted); font-size: .7em; align-items: center; justify-content: center; text-align: center; }
+  .cell.approx .cs { font-style: italic; }
   .hdr { color: var(--muted); display: grid; place-items: center; font-size: max(8px, 1em); }
   .cell {
     aspect-ratio: 3 / 4; border-radius: 3px; background: var(--cell);
@@ -135,7 +140,7 @@
   .cell.cur::after { content: "?"; font-weight: 800; font-size: max(11px, 1.9em); }
   @keyframes pulse { 50% { transform: scale(1.12); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 35%, transparent); } }
   @media (prefers-reduced-motion: reduce) { .cell.cur { animation: none; } }
-  @container (max-width: 640px) { .cell .cs { display: none; } .cell { align-items: center; justify-content: center; padding: 0; } .cell .s { letter-spacing: -.04em; } }
+  @container (max-width: 640px) { .cell .cs { display: none; } .cell { align-items: center; justify-content: center; padding: 0; } .cell .s { letter-spacing: -.04em; } .table.full .cell .s { font-size: max(8.5px, 1.5em); letter-spacing: -.07em; } }
   @media (max-width: 600px) { .board { padding: 8px; } }
 
   .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; color: var(--muted); font-size: .85rem; }
@@ -252,11 +257,19 @@
       </select>
       <label class="sr" for="scope">Abast</label>
       <select id="scope">
-        <option value="all">Tota la taula (47)</option>
-        <option value="p3">Períodes 1–3</option>
-        <option value="p4">Períodes 1–4</option>
-        <option value="main">Només grups principals</option>
-        <option value="trans">Només metalls de transició</option>
+        <optgroup label="Taula completa (118)">
+          <option value="full" selected>Completa · tota (118)</option>
+          <option value="fmain">Completa · grups principals</option>
+          <option value="ftrans">Completa · metalls de transició</option>
+          <option value="ff">Completa · lantànids i actínids</option>
+        </optgroup>
+        <optgroup label="Taula del full (47)">
+          <option value="all">Full · tota (47)</option>
+          <option value="p3">Full · períodes 1–3</option>
+          <option value="p4">Full · períodes 1–4</option>
+          <option value="main">Full · grups principals</option>
+          <option value="trans">Full · metalls de transició</option>
+        </optgroup>
       </select>
       <label class="chk" title="Demana també els protons"><input type="checkbox" id="chkZ"><span>Protons</span></label>
       <button id="btnRank" type="button">🏆 Rànquing</button>
@@ -364,23 +377,49 @@
 <script>
 'use strict';
 
-// [nº atòmic, símbol, nom en català (IEC), columna esquerra, columna dreta]
+// [nº atòmic, símbol, nom en català (IEC), columna esquerra, columna dreta, fora del full]
 // Cada columna es llegeix de dalt a baix, tal com surt a la taula del full.
+// 6è valor: 1 = element que NO surt al full (valors orientatius: només es comprova el conjunt de +/−);
+//           2 = element sense +/− (gasos nobles i elements sense química fiable).
 const DATA = [
-  [1,'H','hidrogen',[-1],[1]],
-  [3,'Li','liti',[],[1]],[4,'Be','beril·li',[],[2]],[5,'B','bor',[-3],[3]],[6,'C','carboni',[-4],[2,4]],[7,'N','nitrogen',[-3],[1,3,5,2]],[8,'O','oxigen',[-2,-1],[]],[9,'F','fluor',[-1],[]],
-  [11,'Na','sodi',[],[1]],[12,'Mg','magnesi',[],[2]],[13,'Al','alumini',[],[3]],[14,'Si','silici',[-4],[2,4]],[15,'P','fòsfor',[-3],[3,5]],[16,'S','sofre',[-2],[2,4,6]],[17,'Cl','clor',[-1],[1,3,5,7]],
-  [19,'K','potassi',[],[1]],[20,'Ca','calci',[],[2]],[24,'Cr','crom',[6],[2,3]],[25,'Mn','manganès',[6,7],[2,3,4]],[26,'Fe','ferro',[],[2,3]],[27,'Co','cobalt',[],[2,3]],[28,'Ni','níquel',[],[2,3]],[29,'Cu','coure',[],[1,2]],[30,'Zn','zinc',[],[2]],
-  [31,'Ga','gal·li',[],[3]],[32,'Ge','germani',[-4],[2,4]],[33,'As','arsènic',[-3],[3,5]],[34,'Se','seleni',[-2],[2,4,6]],[35,'Br','brom',[-1],[1,3,5,7]],
-  [37,'Rb','rubidi',[],[1]],[38,'Sr','estronci',[],[2]],[46,'Pd','pal·ladi',[],[2,4]],[47,'Ag','plata',[],[1]],[48,'Cd','cadmi',[],[2]],[49,'In','indi',[],[3]],[50,'Sn','estany',[],[2,4]],[51,'Sb','antimoni',[-3],[3,5]],[52,'Te','tel·luri',[-2],[2,4,6]],[53,'I','iode',[-1],[1,3,5,7]],
-  [55,'Cs','cesi',[],[1]],[56,'Ba','bari',[],[2]],[78,'Pt','platí',[],[2,4]],[79,'Au','or',[],[1,3]],[80,'Hg','mercuri',[],[1,2]],[81,'Tl','tal·li',[],[1,3]],[82,'Pb','plom',[],[2,4]],[83,'Bi','bismut',[],[3,5]],
+  [1,'H','hidrogen',[-1],[1]],[2,'He','heli',[],[],2],[3,'Li','liti',[],[1]],[4,'Be','beril·li',[],[2]],
+  [5,'B','bor',[-3],[3]],[6,'C','carboni',[-4],[2,4]],[7,'N','nitrogen',[-3],[1,3,5,2]],[8,'O','oxigen',[-2,-1],[]],
+  [9,'F','fluor',[-1],[]],[10,'Ne','neó',[],[],2],[11,'Na','sodi',[],[1]],[12,'Mg','magnesi',[],[2]],
+  [13,'Al','alumini',[],[3]],[14,'Si','silici',[-4],[2,4]],[15,'P','fòsfor',[-3],[3,5]],[16,'S','sofre',[-2],[2,4,6]],
+  [17,'Cl','clor',[-1],[1,3,5,7]],[18,'Ar','argó',[],[],2],[19,'K','potassi',[],[1]],[20,'Ca','calci',[],[2]],
+  [21,'Sc','escandi',[],[3],1],[22,'Ti','titani',[],[2,3,4],1],[23,'V','vanadi',[],[2,3,4,5],1],[24,'Cr','crom',[6],[2,3]],
+  [25,'Mn','manganès',[6,7],[2,3,4]],[26,'Fe','ferro',[],[2,3]],[27,'Co','cobalt',[],[2,3]],[28,'Ni','níquel',[],[2,3]],
+  [29,'Cu','coure',[],[1,2]],[30,'Zn','zinc',[],[2]],[31,'Ga','gal·li',[],[3]],[32,'Ge','germani',[-4],[2,4]],
+  [33,'As','arsènic',[-3],[3,5]],[34,'Se','seleni',[-2],[2,4,6]],[35,'Br','brom',[-1],[1,3,5,7]],[36,'Kr','criptó',[],[],2],
+  [37,'Rb','rubidi',[],[1]],[38,'Sr','estronci',[],[2]],[39,'Y','itri',[],[3],1],[40,'Zr','zirconi',[],[4],1],
+  [41,'Nb','niobi',[],[3,5],1],[42,'Mo','molibdè',[],[3,4,5,6],1],[43,'Tc','tecneci',[],[4,7],1],[44,'Ru','ruteni',[],[3,4],1],
+  [45,'Rh','rodi',[],[3],1],[46,'Pd','pal·ladi',[],[2,4]],[47,'Ag','plata',[],[1]],[48,'Cd','cadmi',[],[2]],
+  [49,'In','indi',[],[3]],[50,'Sn','estany',[],[2,4]],[51,'Sb','antimoni',[-3],[3,5]],[52,'Te','tel·luri',[-2],[2,4,6]],
+  [53,'I','iode',[-1],[1,3,5,7]],[54,'Xe','xenó',[],[],2],[55,'Cs','cesi',[],[1]],[56,'Ba','bari',[],[2]],
+  [57,'La','lantani',[],[3],1],[58,'Ce','ceri',[],[3,4],1],[59,'Pr','praseodimi',[],[3],1],[60,'Nd','neodimi',[],[3],1],
+  [61,'Pm','prometi',[],[3],1],[62,'Sm','samari',[],[2,3],1],[63,'Eu','europi',[],[2,3],1],[64,'Gd','gadolini',[],[3],1],
+  [65,'Tb','terbi',[],[3],1],[66,'Dy','disprosi',[],[3],1],[67,'Ho','holmi',[],[3],1],[68,'Er','erbi',[],[3],1],
+  [69,'Tm','tuli',[],[3],1],[70,'Yb','iterbi',[],[2,3],1],[71,'Lu','luteci',[],[3],1],[72,'Hf','hafni',[],[4],1],
+  [73,'Ta','tàntal',[],[5],1],[74,'W','wolframi',[],[4,6],1],[75,'Re','reni',[],[4,7],1],[76,'Os','osmi',[],[4,8],1],
+  [77,'Ir','iridi',[],[3,4],1],[78,'Pt','platí',[],[2,4]],[79,'Au','or',[],[1,3]],[80,'Hg','mercuri',[],[1,2]],
+  [81,'Tl','tal·li',[],[1,3]],[82,'Pb','plom',[],[2,4]],[83,'Bi','bismut',[],[3,5]],[84,'Po','poloni',[],[2,4],1],
+  [85,'At','àstat',[-1],[1,3,5,7],1],[86,'Rn','radó',[],[],2],[87,'Fr','franci',[],[1],1],[88,'Ra','radi',[],[2],1],
+  [89,'Ac','actini',[],[3],1],[90,'Th','tori',[],[4],1],[91,'Pa','protactini',[],[4,5],1],[92,'U','urani',[],[3,4,5,6],1],
+  [93,'Np','neptuni',[],[3,4,5,6],1],[94,'Pu','plutoni',[],[3,4,5,6],1],[95,'Am','americi',[],[3],1],[96,'Cm','curi',[],[3],1],
+  [97,'Bk','berkeli',[],[3,4],1],[98,'Cf','californi',[],[3],1],[99,'Es','einsteini',[],[3],1],[100,'Fm','fermi',[],[3],1],
+  [101,'Md','mendelevi',[],[3],1],[102,'No','nobeli',[],[2],1],[103,'Lr','lawrenci',[],[3],1],[104,'Rf','rutherfordi',[],[4],1],
+  [105,'Db','dubni',[],[5],1],[106,'Sg','seaborgi',[],[6],1],[107,'Bh','bohri',[],[7],1],[108,'Hs','hassi',[],[8],1],
+  [109,'Mt','meitneri',[],[],2],[110,'Ds','darmstadti',[],[],2],[111,'Rg','roentgeni',[],[],2],[112,'Cn','copernici',[],[],2],
+  [113,'Nh','nihoni',[],[],2],[114,'Fl','flerovi',[],[],2],[115,'Mc','moscovi',[],[],2],[116,'Lv','livermori',[],[],2],
+  [117,'Ts','tennessi',[],[],2],[118,'Og','oganessó',[],[],2],
 ];
-const ELS = DATA.map(e => ({ z: e[0], sym: e[1], name: e[2], l: e[3], r: e[4] }));
+const ELS = DATA.map(e => ({ z: e[0], sym: e[1], name: e[2], l: e[3], r: e[4], ext: e[5] || 0 }));
 const BY_Z = Object.fromEntries(ELS.map(e => [e.z, e]));
 
-// Posició (fila = període, columna = grup)
+// Posició (fila = període, columna = grup). Files 9 i 10: lantànids i actínids.
 function pos(z) {
   if (z === 1) return [1, 1];
+  if (z === 2) return [1, 18];
   if (z <= 4) return [2, z - 2];
   if (z <= 10) return [2, z + 8];
   if (z <= 12) return [3, z - 10];
@@ -388,19 +427,30 @@ function pos(z) {
   if (z <= 36) return [4, z - 18];
   if (z <= 54) return [5, z - 36];
   if (z <= 56) return [6, z - 54];
-  return [6, z - 68]; // Hf..Bi (72–83)
+  if (z <= 71) return [9, z - 54];
+  if (z <= 86) return [6, z - 68];
+  if (z <= 88) return [7, z - 86];
+  if (z <= 103) return [10, z - 86];
+  return [7, z - 100];
 }
-// Caselles buides de la taula (no es pregunten)
-const BLANKS = [[4,3],[4,4],[4,5],
-  [5,3],[5,4],[5,5],[5,6],[5,7],[5,8],[5,9],
-  [6,3],[6,4],[6,5],[6,6],[6,7],[6,8],[6,9],[6,16],[6,17]];
+// Al «full» només es veuen els elements amb valors; la resta de caselles són buides o no hi són.
+const SHEET_BLANK_Z = new Set([21, 22, 23, 39, 40, 41, 42, 43, 44, 45, 72, 73, 74, 75, 76, 77, 84, 85]);
+const SHEET_SCOPES = new Set(['all', 'p3', 'p4', 'main', 'trans']);
+const inSheet = z => !BY_Z[z].ext;
+const colOf = z => pos(z)[1], rowOf = z => pos(z)[0];
 
 const SCOPES = {
-  all:   z => true,
-  p3:    z => pos(z)[0] <= 3,
-  p4:    z => pos(z)[0] <= 4,
-  main:  z => { const c = pos(z)[1]; return c <= 2 || c >= 13; },
-  trans: z => { const c = pos(z)[1]; return c >= 6 && c <= 12; },
+  // Taula del full (47)
+  all:   z => inSheet(z),
+  p3:    z => inSheet(z) && rowOf(z) <= 3,
+  p4:    z => inSheet(z) && rowOf(z) <= 4,
+  main:  z => inSheet(z) && (colOf(z) <= 2 || colOf(z) >= 13),
+  trans: z => inSheet(z) && colOf(z) >= 6 && colOf(z) <= 12,
+  // Taula completa (118)
+  full:   z => true,
+  fmain:  z => rowOf(z) <= 7 && (colOf(z) <= 2 || colOf(z) >= 13),
+  ftrans: z => rowOf(z) >= 4 && rowOf(z) <= 7 && colOf(z) >= 3 && colOf(z) <= 12,
+  ff:     z => rowOf(z) >= 9,
 };
 
 const LEVELS = {
@@ -440,16 +490,24 @@ const tableEl = $('table');
 const cellEls = {};
 
 // ---------- Construcció de la taula ----------
+const hdrEls = [], phEls = [];
 function buildTable() {
   tableEl.innerHTML = '';
   const put = (el, r, c) => { el.style.gridRow = r + 1; el.style.gridColumn = c + 1; tableEl.appendChild(el); };
-  for (let c = 1; c <= 17; c++) { const h = document.createElement('div'); h.className = 'hdr'; h.textContent = c; put(h, 0, c); }
-  for (let r = 1; r <= 6; r++) { const h = document.createElement('div'); h.className = 'hdr'; h.textContent = r; put(h, r, 0); }
-  for (const [r, c] of BLANKS) { const d = document.createElement('div'); d.className = 'cell blank'; put(d, r, c); }
+  const hdr = (txt, r, c, onlyFull) => { const h = document.createElement('div'); h.className = 'hdr'; h.textContent = txt; put(h, r, c); hdrEls.push([h, onlyFull]); };
+  for (let c = 1; c <= 18; c++) hdr(c, 0, c, c === 18);
+  for (let r = 1; r <= 7; r++) hdr(r, r, 0, r === 7);
   for (const e of ELS) {
     const d = document.createElement('div'); d.className = 'cell';
     const [r, c] = pos(e.z); put(d, r, c); cellEls[e.z] = d;
   }
+  for (const [r, txt] of [[6, '57–71'], [7, '89–103']]) { const d = document.createElement('div'); d.textContent = txt; put(d, r, 3); phEls.push(d); }
+}
+function applyLayout(sheet) {
+  tableEl.className = 'table ' + (sheet ? 'sheet' : 'full');
+  for (const [h, onlyFull] of hdrEls) h.hidden = sheet && onlyFull;
+  phEls[0].className = 'cell ' + (sheet ? 'blank' : 'ph'); phEls[0].textContent = sheet ? '' : '57–71';
+  phEls[1].className = 'cell ' + (sheet ? 'gone' : 'ph');
 }
 
 // ---------- Estat del joc ----------
@@ -469,7 +527,7 @@ function chHtml(e) {
 }
 function setCell(z, state) {
   const d = cellEls[z], e = BY_Z[z];
-  d.className = 'cell' + (state ? ' ' + state : '');
+  d.className = 'cell' + (e.ext ? ' approx' : '') + (state ? ' ' + state : '');
   d.removeAttribute('title');
   if (state === 'ok' || state === 'mid' || state === 'ko') {
     d.innerHTML = chHtml(e) + '<span class="s">' + e.sym + '</span>';
@@ -479,7 +537,12 @@ function setCell(z, state) {
 
 function start() {
   const inScope = SCOPES[$('scope').value];
-  for (const e of ELS) setCell(e.z, inScope(e.z) ? '' : 'off');
+  const sheet = SHEET_SCOPES.has($('scope').value);
+  applyLayout(sheet);
+  for (const e of ELS) {
+    if (sheet && e.ext) { const d = cellEls[e.z]; d.className = 'cell ' + (SHEET_BLANK_Z.has(e.z) ? 'blank' : 'gone'); d.innerHTML = ''; d.removeAttribute('title'); }
+    else setCell(e.z, inScope(e.z) ? '' : 'off');
+  }
   const list = ELS.filter(e => inScope(e.z));
   const order = $('order').value;
   if (order === 'rows') list.sort((a, b) => { const pa = pos(a.z), pb = pos(b.z); return pa[0] - pb[0] || pa[1] - pb[1]; });
@@ -499,6 +562,7 @@ function start() {
 let reviewTotal = 0;
 const unitOf = z => ($('order').value === 'rows' ? pos(z)[0] : pos(z)[1]);
 const unitName = () => ($('order').value === 'rows' ? 'Fila' : 'Columna');
+const unitLabel = u => ($('order').value === 'rows' && u >= 9 ? (u === 9 ? 'Lantànids' : 'Actínids') : unitName() + ' ' + u);
 
 // Selector per canviar de fila/columna (només amb ordre per files o per columnes, durant la primera ronda)
 function updateJump() {
@@ -508,13 +572,13 @@ function updateJump() {
   if (!on) return;
   const inScope = SCOPES[$('scope').value], pend = {};
   for (const e of ELS) if (inScope(e.z) && !resolved.has(e.z)) { const u = unitOf(e.z); pend[u] = (pend[u] || 0) + 1; }
-  $('jumpCur').innerHTML = cur ? unitName() + ' <b>' + unitOf(cur.z) + '</b>' : '';
+  $('jumpCur').innerHTML = cur ? '<b>' + unitLabel(unitOf(cur.z)) + '</b>' : '';
   const word = mode === 'rows' ? 'fila' : 'columna';
   $('jumpLbl').textContent = 'Canvia de ' + word;
   const sel = $('jumpSel');
   sel.replaceChildren(new Option('Canvia de ' + word + '…', ''));
   for (const u of Object.keys(pend).map(Number).sort((a, b) => a - b))
-    sel.add(new Option(unitName() + ' ' + u + ' · ' + pend[u] + (pend[u] === 1 ? ' pendent' : ' pendents'), u));
+    sel.add(new Option(unitLabel(u) + ' · ' + pend[u] + (pend[u] === 1 ? ' pendent' : ' pendents'), u));
   sel.value = '';
 }
 function jumpTo(u) {
@@ -558,14 +622,15 @@ function next() {
   cur = BY_Z[queue.shift()]; attempts = 0; solved = false;
   const [r, c] = pos(cur.z);
   const L = lv();
-  cellEls[cur.z].className = 'cell cur' + (L.show ? ' sym' : '');
+  cellEls[cur.z].className = 'cell cur' + (cur.ext ? ' approx' : '') + (L.show ? ' sym' : '');
   cellEls[cur.z].innerHTML = L.show ? '<span class="s">' + cur.sym + '</span>' : '';
-  const where = 'Grup ' + c + ' · Període ' + r;
+  const where = r === 9 ? 'Lantànids · ' + (c - 2) + 'a posició' : r === 10 ? 'Actínids · ' + (c - 2) + 'a posició' : 'Grup ' + c + ' · Període ' + r;
   $('where').innerHTML = (L.show ? 'Quin és el nom d\'aquest element?' : 'Quina casella és la que brilla?') + '<small>' + where + '</small>';
-  $('fSym').hidden = !L.sym; $('fCh').hidden = !L.ch; $('fName').hidden = !L.name; $('fZ').hidden = !L.z;
+  $('fSym').hidden = !L.sym; $('fCh').hidden = !(L.ch && cur.ext !== 2); $('fName').hidden = !L.name; $('fZ').hidden = !L.z;
   $('form').reset();
   for (const id of ['fSym', 'fCh', 'fName', 'fZ']) { const f = $(id); f.className = 'field'; f.querySelector('.note').textContent = ''; }
   resetSel();
+  if (cur.ext === 1) $('fCh').querySelector('.note').textContent = 'Element fora del full: valors orientatius; només es comprova el conjunt, sense costat ni ordre.';
   zoneEl.l.classList.remove('good', 'bad'); zoneEl.r.classList.remove('good', 'bad');
   showMsg('');
   $('btnMain').textContent = 'Comprova'; $('btnSolve').disabled = false; $('btnSkip').disabled = false;
@@ -593,7 +658,7 @@ function renderZones() {
 }
 function resetSel() { sel.l = []; sel.r = []; side = 'l'; renderZones(); }
 (function buildChips() {
-  for (const v of [-4, -3, -2, -1, 1, 2, 3, 4, 5, 6, 7]) {
+  for (const v of [-4, -3, -2, -1, 1, 2, 3, 4, 5, 6, 7, 8]) {
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'chip ' + (v < 0 ? 'n' : 'p'); b.dataset.v = v;
     b.textContent = fmtCh(v); b.setAttribute('aria-pressed', 'false');
@@ -631,13 +696,18 @@ function grade() {
   const z = parseInt($('inZ').value, 10);
   res.z = z === cur.z;
   const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
-  res.l = same(sel.l, cur.l); res.r = same(sel.r, cur.r); res.ch = res.l && res.r;
+  if (cur.ext === 2) { res.l = res.r = res.ch = true; }
+  else if (cur.ext === 1) {
+    const num = (a, b) => a - b, all = x => x.l.concat(x.r).sort(num);
+    res.ch = same(all(sel), all(cur)); res.l = res.r = res.ch;
+  } else { res.l = same(sel.l, cur.l); res.r = same(sel.r, cur.r); res.ch = res.l && res.r; }
   return res;
 }
 
 function solutionText() {
   const f = a => a.length ? a.map(fmtCh).join(' ') : '—';
-  return cur.sym + ' · ' + cur.name + ' · esquerra: ' + f(cur.l) + ' · dreta: ' + f(cur.r) + ' · ' + cur.z + ' protons';
+  const ch = cur.ext === 2 ? ' · sense +/−' : ' · esquerra: ' + f(cur.l) + ' · dreta: ' + f(cur.r) + (cur.ext === 1 ? ' (orientatiu)' : '');
+  return cur.sym + ' · ' + cur.name + ch + ' · ' + cur.z + ' protons';
 }
 
 function check() {
@@ -646,7 +716,11 @@ function check() {
   if (L.sym) mark('fSym', r.sym, r.sym ? '' : 'Torna-ho a provar');
   if (L.name) mark('fName', r.name, r.name ? (r.nameExact ? '' : 'Ortografia: ' + cur.name) : 'Torna-ho a provar');
   if (L.z) mark('fZ', r.z, r.z ? '' : 'Torna-ho a provar');
-  if (L.ch) {
+  if (L.ch && cur.ext === 1) {
+    mark('fCh', r.ch, r.ch ? '' : 'Torna-ho a provar · en té ' + cur.l.concat(cur.r).length + (cur.l.concat(cur.r).length === 1 ? ' valor' : ' valors') + ' (no importen costat ni ordre)');
+    zoneEl.l.classList.toggle('good', r.ch); zoneEl.l.classList.toggle('bad', !r.ch);
+    zoneEl.r.classList.toggle('good', r.ch); zoneEl.r.classList.toggle('bad', !r.ch);
+  } else if (L.ch && cur.ext !== 2) {
     mark('fCh', r.ch, r.ch ? '' : 'Torna-ho a provar (esquerra ' + (r.l ? '✓' : '✗') + ', dreta ' + (r.r ? '✓' : '✗') + ' · compte amb l\'ordre)');
     zoneEl.l.classList.toggle('good', r.l); zoneEl.l.classList.toggle('bad', !r.l);
     zoneEl.r.classList.toggle('good', r.r); zoneEl.r.classList.toggle('bad', !r.r);
@@ -676,7 +750,7 @@ function reveal() {
   if (L.sym) mark('fSym', true);
   if (L.name) mark('fName', true);
   if (L.z) mark('fZ', true);
-  if (L.ch) {
+  if (L.ch && cur.ext !== 2) {
     sel.l = cur.l.slice(); sel.r = cur.r.slice(); renderZones(); mark('fCh', true);
     zoneEl.l.classList.add('good'); zoneEl.r.classList.add('good');
   }
